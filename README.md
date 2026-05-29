@@ -1,7 +1,5 @@
 # muninx
 
-![Demo](assets/screenshot.png)
-
 ## Introduction
 
 `muninx` is a terminal journal management tool with a TUI interface for structured note-taking. Notes are organized in a three-level hierarchy inspired by version control: **Thread → Branch → Note**.

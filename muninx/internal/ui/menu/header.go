@@ -1,4 +1,4 @@
-package openmenu
+package menu
 
 import (
 	"image/color"
@@ -8,15 +8,14 @@ import (
 	"github.com/haochend413/lipgloss/v2"
 )
 
-// This package defines the header of the opening menu.
-
-type Opts struct {
-	MainTextColor color.Color // diagonal lines
-	Width         int         // width of the rendered logo, used for truncation
+// HeaderOpts controls how the ASCII logo header is rendered.
+type HeaderOpts struct {
+	MainTextColor color.Color
+	Width         int
 	Height        int
 }
 
-func Render(base lipgloss.Style, o Opts) string {
+func renderHeader(base lipgloss.Style, o HeaderOpts) string {
 	text := RenderMuninx()
 
 	style := base.Foreground(o.MainTextColor).Border(lipgloss.BlockBorder(), false, false, false, false)

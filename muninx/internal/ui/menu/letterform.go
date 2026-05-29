@@ -1,4 +1,4 @@
-package openmenu
+package menu
 
 import (
 	"strings"
@@ -39,13 +39,13 @@ func LetterM(stretch bool) string {
 	innerLeft := heredoc.Doc(`
 		▄
 		█
-		 
+
 	`)
 
 	innerRight := heredoc.Doc(`
 		▄
 		█
-		 
+
 	`)
 
 	right := heredoc.Doc(`
@@ -131,7 +131,7 @@ func LetterN(stretch bool) string {
 func LetterI(stretch bool) string {
 	left := heredoc.Doc(`
 		▀
-		 
+
 		▀
 	`)
 
@@ -143,7 +143,7 @@ func LetterI(stretch bool) string {
 
 	right := heredoc.Doc(`
 		▀
-		 
+
 		▀
 	`)
 
@@ -167,7 +167,7 @@ func LetterI(stretch bool) string {
 func LetterX(stretch bool) string {
 	left := heredoc.Doc(`
 		█
-		 
+
 		▀
 	`)
 
@@ -179,7 +179,7 @@ func LetterX(stretch bool) string {
 
 	right := heredoc.Doc(`
 		█
-		 
+
 		▀
 	`)
 

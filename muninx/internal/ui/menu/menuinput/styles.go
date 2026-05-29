@@ -45,21 +45,14 @@ func DefaultDarkStyles() Styles {
 }
 
 // Styles are the styles for the textarea, separated into focused and blurred
-// states. The appropriate styles will be chosen based on the focus state of
-// the textarea.
+// states.
 type Styles struct {
 	Focused StyleState
 	Blurred StyleState
 	Cursor  CursorStyle
 }
 
-// StyleState that will be applied to the text area.
-//
-// StyleState can be applied to focused and unfocused states to change the styles
-// depending on the focus state.
-//
-// For an introduction to styling with Lip Gloss see:
-// https://github.com/charmbracelet/lipgloss
+// StyleState holds the styles for a single focus state.
 type StyleState struct {
 	Text        lipgloss.Style
 	Placeholder lipgloss.Style
@@ -69,28 +62,8 @@ type StyleState struct {
 
 // CursorStyle is the style for real and virtual cursors.
 type CursorStyle struct {
-	// Style styles the cursor block.
-	//
-	// For real cursors, the foreground color set here will be used as the
-	// cursor color.
-	Color color.Color
-
-	// Shape is the cursor shape. The following shapes are available:
-	//
-	// - tea.CursorBlock
-	// - tea.CursorUnderline
-	// - tea.CursorBar
-	//
-	// This is only used for real cursors.
-	Shape tea.CursorShape
-
-	// CursorBlink determines whether or not the cursor should blink.
-	Blink bool
-
-	// BlinkSpeed is the speed at which the virtual cursor blinks. This has no
-	// effect on real cursors as well as no effect if the cursor is set not to
-	// [CursorBlink].
-	//
-	// By default, the blink speed is set to about 500ms.
+	Color      color.Color
+	Shape      tea.CursorShape
+	Blink      bool
 	BlinkSpeed time.Duration
 }
