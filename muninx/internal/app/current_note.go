@@ -269,7 +269,7 @@ func (a *App) ToggleCurrentNotePrivate(link *models.Superlink) {
 // =============================================================================
 // Topic subsystem removed: topic add/remove APIs have been removed.
 
-// DeleteCurrentNote removes the current note from the current branch and tracks the deletion
+// DeleteCurrentNote removes the current note and tracks the deletion for sync.
 func (a *App) DeleteCurrentNote(link *models.Superlink) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
@@ -278,14 +278,10 @@ func (a *App) DeleteCurrentNote(link *models.Superlink) {
 	if note == nil {
 		return
 	}
-
 	noteID := note.ID
 	branch := a.getCurrentBranch()
 
-	edit, exists := a.editMgr.GetEdit(editstack.EntityNote, noteID)
-	if exists && edit.EditType == editstack.CreateNote {
-		a.editMgr.RemoveEdit(editstack.EntityNote, noteID)
-	} else if noteID != 0 {
+	if noteID != 0 {
 		deleteEdit := &editstack.Edit{ID: noteID, EditType: editstack.DeleteNote}
 		if err := a.editMgr.AddEdit(deleteEdit, link); err != nil {
 			log.Printf("Error tracking note deletion: %v", err)
@@ -293,18 +289,12 @@ func (a *App) DeleteCurrentNote(link *models.Superlink) {
 		}
 	}
 
-	// Mark branch as updated to sync the association change
-	// Only if branch is not pending (not being created)
+	// Mark branch for update so the branch_notes join table is cleaned up on sync.
 	if branch != nil && branch.ID != 0 {
-		branchEdit, branchExists := a.editMgr.GetEdit(editstack.EntityBranch, branch.ID)
-		if !branchExists || branchEdit.EditType != editstack.CreateBranch {
-			// Branch is not pending creation, safe to mark for update
-			updateEdit := &editstack.Edit{ID: branch.ID, EditType: editstack.UpdateBranch}
-			a.editMgr.AddEdit(updateEdit, link) // Ignore error - branch might already be marked
-		}
+		updateEdit := &editstack.Edit{ID: branch.ID, EditType: editstack.UpdateBranch}
+		a.editMgr.AddEdit(updateEdit, link) //nolint:errcheck — branch might already be marked
 	}
 
-	// Find the index of the note in the active note list
 	notes := a.dataMgr.GetActiveNoteList()
 	for i, n := range notes {
 		if n.ID == noteID {
@@ -312,6 +302,5 @@ func (a *App) DeleteCurrentNote(link *models.Superlink) {
 			break
 		}
 	}
-
 	a.Synced = false
 }

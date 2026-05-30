@@ -8,24 +8,6 @@ import (
 	"github.com/haochend413/muninx/internal/models"
 )
 
-type NextCreateIDs struct {
-	NoteID   uint
-	BranchID uint
-	ThreadID uint
-}
-
-func (d *DB) GetNextCreateIDs() NextCreateIDs {
-	var ids NextCreateIDs
-	var noteMax, branchMax, threadMax uint
-	d.Conn.Raw("SELECT COALESCE(MAX(id), 0) FROM notes").Scan(&noteMax)
-	d.Conn.Raw("SELECT COALESCE(MAX(id), 0) FROM branches").Scan(&branchMax)
-	d.Conn.Raw("SELECT COALESCE(MAX(id), 0) FROM threads").Scan(&threadMax)
-	ids.NoteID = noteMax + 1
-	ids.BranchID = branchMax + 1
-	ids.ThreadID = threadMax + 1
-	return ids
-}
-
 // export the serialized data into desired position
 func (d *DB) ExportNoteToJSON(path string) error {
 	dir := filepath.Dir(path)

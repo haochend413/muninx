@@ -13,7 +13,7 @@ func (m Model) RenderContent() string {
 	}
 	header := renderHeader(styles.BaseStyle, o)
 
-	tableBox := styles.FocusedStyle.Width(m.layout.WindowWidth).Render(m.table.View())
+	tableBox := styles.FocusedStyle.Width(m.layout.WindowWidth).Border(lipgloss.Border{}, false, false, false, false).Render(m.table.View())
 
 	inputBox := styles.BaseStyle.
 		Width(m.layout.InputWidth).

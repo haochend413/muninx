@@ -3,8 +3,8 @@ package menu
 import (
 	"fmt"
 
-	bTable "github.com/haochend413/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	bTable "github.com/haochend413/bubbles/v2/table"
 	"github.com/haochend413/muninx/internal/app"
 	"github.com/haochend413/muninx/internal/ui/menu/menuinput"
 	"github.com/haochend413/muninx/internal/ui/styles"

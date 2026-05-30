@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/haochend413/muninx/internal/clients"
@@ -64,4 +65,25 @@ func (d *DB) Close() error {
 		return err
 	}
 	return sqlDB.Close()
+}
+
+// CreateThread inserts a new thread immediately and sets thread.ID from the
+// database-assigned autoincrement value.
+func (d *DB) CreateThread(thread *models.Thread) error {
+	return d.Conn.Omit("Branches").Create(thread).Error
+}
+
+// CreateBranch inserts a new branch immediately and sets branch.ID.
+func (d *DB) CreateBranch(branch *models.Branch) error {
+	return d.Conn.Omit("Notes").Create(branch).Error
+}
+
+// CreateNote inserts a new note immediately, sets note.ID, and writes the
+// branch_notes join-table row so the association is persisted from the start.
+func (d *DB) CreateNote(note *models.Note) error {
+	note.Content = strings.TrimSpace(note.Content)
+	if err := d.Conn.Omit("Branches").Create(note).Error; err != nil {
+		return err
+	}
+	return d.Conn.Model(note).Association("Branches").Replace(note.Branches)
 }

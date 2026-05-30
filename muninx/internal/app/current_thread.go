@@ -316,7 +316,8 @@ func (a *App) ToggleCurrentThreadPrivate(link *models.Superlink) {
 // Thread Deletion
 // =============================================================================
 
-// DeleteCurrentThread removes the current thread and all its branches and tracks the deletion
+// DeleteCurrentThread removes the current thread and tracks the deletion for sync.
+// SQLite cascade will delete the thread's branches and notes from the DB.
 func (a *App) DeleteCurrentThread(link *models.Superlink) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
@@ -325,29 +326,9 @@ func (a *App) DeleteCurrentThread(link *models.Superlink) {
 	if thread == nil {
 		return
 	}
-
 	threadID := thread.ID
 
-	// Clean up pending CreateBranch/CreateNote edits for entities inside this thread
-	for _, branch := range thread.Branches {
-		if branchEdit, branchExists := a.editMgr.GetEdit(editstack.EntityBranch, branch.ID); branchExists && branchEdit.EditType == editstack.CreateBranch {
-			a.editMgr.RemoveEdit(editstack.EntityBranch, branch.ID)
-		}
-		for _, note := range branch.Notes {
-			if noteEdit, noteExists := a.editMgr.GetEdit(editstack.EntityNote, note.ID); noteExists && noteEdit.EditType == editstack.CreateNote {
-				a.editMgr.RemoveEdit(editstack.EntityNote, note.ID)
-			}
-		}
-	}
-
-	// Determine if thread was just created or exists in DB
-	edit, exists := a.editMgr.GetEdit(editstack.EntityThread, threadID)
-
-	if exists && edit.EditType == editstack.CreateThread {
-		// Thread was created but not yet synced - just discard it
-		a.editMgr.RemoveEdit(editstack.EntityThread, threadID)
-	} else if threadID != 0 {
-		// Thread exists in DB - mark for deletion (will cascade to branches)
+	if threadID != 0 {
 		deleteEdit := &editstack.Edit{ID: threadID, EditType: editstack.DeleteThread}
 		if err := a.editMgr.AddEdit(deleteEdit, link); err != nil {
 			log.Printf("Error tracking thread deletion: %v", err)
@@ -355,7 +336,6 @@ func (a *App) DeleteCurrentThread(link *models.Superlink) {
 		}
 	}
 
-	// Find the index of the thread in the thread list
 	threads := a.dataMgr.GetThreads()
 	for i, t := range threads {
 		if t.ID == threadID {
@@ -363,6 +343,5 @@ func (a *App) DeleteCurrentThread(link *models.Superlink) {
 			break
 		}
 	}
-
 	a.Synced = false
 }

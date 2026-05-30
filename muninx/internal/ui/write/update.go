@@ -1,8 +1,8 @@
 package write
 
 import (
-	"github.com/haochend413/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/haochend413/bubbles/v2/key"
 )
 
 type keyMap struct {

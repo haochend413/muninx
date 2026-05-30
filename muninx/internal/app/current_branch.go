@@ -315,7 +315,7 @@ func (a *App) ToggleCurrentBranchPrivate(link *models.Superlink) {
 // Branch Deletion
 // =============================================================================
 
-// DeleteCurrentBranch removes the current branch from the current thread and tracks the deletion
+// DeleteCurrentBranch removes the current branch and tracks the deletion for sync.
 func (a *App) DeleteCurrentBranch(link *models.Superlink) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
@@ -324,24 +324,9 @@ func (a *App) DeleteCurrentBranch(link *models.Superlink) {
 	if branch == nil {
 		return
 	}
-
 	branchID := branch.ID
 
-	// Clean up pending CreateNote edits for notes inside this branch
-	for _, note := range branch.Notes {
-		if noteEdit, noteExists := a.editMgr.GetEdit(editstack.EntityNote, note.ID); noteExists && noteEdit.EditType == editstack.CreateNote {
-			a.editMgr.RemoveEdit(editstack.EntityNote, note.ID)
-		}
-	}
-
-	// Determine if branch was just created or exists in DB
-	edit, exists := a.editMgr.GetEdit(editstack.EntityBranch, branchID)
-
-	if exists && edit.EditType == editstack.CreateBranch {
-		// Branch was created but not yet synced - just discard it
-		a.editMgr.RemoveEdit(editstack.EntityBranch, branchID)
-	} else if branchID != 0 {
-		// Branch exists in DB - mark for deletion
+	if branchID != 0 {
 		deleteEdit := &editstack.Edit{ID: branchID, EditType: editstack.DeleteBranch}
 		if err := a.editMgr.AddEdit(deleteEdit, link); err != nil {
 			log.Printf("Error tracking branch deletion: %v", err)
@@ -349,7 +334,6 @@ func (a *App) DeleteCurrentBranch(link *models.Superlink) {
 		}
 	}
 
-	// Find the index of the branch in the active branch list
 	branches := a.dataMgr.GetActiveBranchList()
 	for i, b := range branches {
 		if b.ID == branchID {
@@ -357,6 +341,5 @@ func (a *App) DeleteCurrentBranch(link *models.Superlink) {
 			break
 		}
 	}
-
 	a.Synced = false
 }
