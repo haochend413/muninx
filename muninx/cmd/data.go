@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/haochend413/muninx/config"
+	"github.com/haochend413/muninx/sys"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +18,7 @@ var ExportNoteCmd = &cobra.Command{
 	Long:  "export",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := globalDB.ExportNoteToJSON(globalCfg.DataFilePath + "/notes.json"); err != nil {
-			fmt.Fprintf(os.Stderr, "Export failed: %v\n", err)
+			sys.LogError(err)
 			os.Exit(1)
 		}
 		fmt.Println("Exported notes to", globalCfg.DataFilePath+"/notes.json")
@@ -31,7 +32,7 @@ var DataBackupCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		base, err := config.BasePathDefault()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting base path: %v\n", err)
+			sys.LogError(err)
 			return
 		}
 
@@ -49,7 +50,7 @@ var DataBackupCmd = &cobra.Command{
 
 		cpCmd := exec.Command("cp", "-r", base, dest)
 		if output, err := cpCmd.CombinedOutput(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error backing up: %v\n%s\n", err, output)
+			sys.LogError(fmt.Errorf("Error backing up: %v\n%s", err, output))
 			return
 		}
 

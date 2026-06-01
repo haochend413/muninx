@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	tea "charm.land/bubbletea/v2"
@@ -12,6 +11,7 @@ import (
 	"github.com/haochend413/muninx/internal/db"
 	"github.com/haochend413/muninx/internal/ui"
 	"github.com/haochend413/muninx/state"
+	"github.com/haochend413/muninx/sys"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +36,8 @@ var rootCmd = &cobra.Command{
 		var err error
 		globalDB, err = db.NewDB(cfg.DataFilePath+"/notes_dev.db", globalEmbedClient) // TODO: change this back in official version!
 		if err != nil {
-			log.Fatal("Failed to connect to database:", err)
+			sys.LogError(fmt.Errorf("Failed to connect to database: %v", err))
+			os.Exit(1)
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -57,7 +58,8 @@ var rootCmd = &cobra.Command{
 		// Run Bubble Tea program
 		p := tea.NewProgram(model)
 		if _, err := p.Run(); err != nil {
-			log.Fatal(err)
+			sys.LogError(err)
+			os.Exit(1)
 		}
 	},
 }
@@ -70,7 +72,7 @@ func Execute() {
 	}()
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Oops. An error while executing Zero '%s'\n", err)
+		sys.LogError(err)
 		os.Exit(1)
 	}
 }

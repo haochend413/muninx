@@ -2,11 +2,11 @@ package db
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	editstack "github.com/haochend413/muninx/internal/app/editStack"
 	"github.com/haochend413/muninx/internal/models"
+	"github.com/haochend413/muninx/sys"
 )
 
 // SyncData persists pending updates and deletes from editMap, then reloads the
@@ -70,7 +70,9 @@ func (d *DB) SyncData(
 	for _, id := range threadPendingIDs {
 		if t, ok := threadsMap[id]; ok {
 			if err := d.persistThread(t); err != nil {
-				return nil, fmt.Errorf("failed to update thread %d: %w", t.ID, err)
+				wrappedErr := fmt.Errorf("failed to update thread %d: %w", t.ID, err)
+				sys.LogError(wrappedErr)
+				return nil, wrappedErr
 			}
 		}
 	}
@@ -78,7 +80,9 @@ func (d *DB) SyncData(
 	for _, id := range notePendingIDs {
 		if n, ok := notesMap[id]; ok {
 			if err := d.persistNote(n); err != nil {
-				return nil, fmt.Errorf("failed to update note %d: %w", n.ID, err)
+				wrappedErr := fmt.Errorf("failed to update note %d: %w", n.ID, err)
+				sys.LogError(wrappedErr)
+				return nil, wrappedErr
 			}
 		}
 	}
@@ -86,7 +90,9 @@ func (d *DB) SyncData(
 	for _, id := range branchPendingIDs {
 		if b, ok := branchesMap[id]; ok {
 			if err := d.persistBranch(b); err != nil {
-				return nil, fmt.Errorf("failed to update branch %d: %w", b.ID, err)
+				wrappedErr := fmt.Errorf("failed to update branch %d: %w", b.ID, err)
+				sys.LogError(wrappedErr)
+				return nil, wrappedErr
 			}
 		}
 	}
@@ -119,11 +125,11 @@ func (d *DB) persistNote(note *models.Note) error {
 	if d.EmbedClient != nil && note.Content != "" {
 		embedding, err := d.EmbedClient.Embed(note.Content)
 		if err != nil {
-			log.Printf("embedding skipped for note %d: %v", note.ID, err)
+			sys.LogError(fmt.Errorf("embedding skipped for note %d: %v", note.ID, err))
 			return nil
 		}
 		if err := d.UpsertNoteEmbedding(note.ID, embedding); err != nil {
-			log.Printf("upsert embedding skipped for note %d: %v", note.ID, err)
+			sys.LogError(fmt.Errorf("upsert embedding skipped for note %d: %v", note.ID, err))
 		}
 	}
 	return nil

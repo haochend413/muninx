@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/haochend413/muninx/sys"
 )
 
 type EmbedClient struct {
@@ -27,7 +29,9 @@ func (c *EmbedClient) Embed(text string) ([]float32, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("embedding server status: %d", resp.StatusCode)
+		err := fmt.Errorf("embedding server status: %d", resp.StatusCode)
+		sys.LogError(err)
+		return nil, err
 	}
 
 	var out struct {

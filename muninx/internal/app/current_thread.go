@@ -1,12 +1,14 @@
 package app
 
 import (
-	"log"
+	"errors"
+	"os"
 	"strings"
 	"time"
 
 	editstack "github.com/haochend413/muninx/internal/app/editStack"
 	"github.com/haochend413/muninx/internal/models"
+	"github.com/haochend413/muninx/sys"
 )
 
 // current_thread.go provides a controlled interface for accessing and modifying
@@ -18,7 +20,8 @@ import (
 
 func (a *App) getCurrentThread() *models.Thread {
 	if a.dataMgr == nil {
-		log.Fatal("Critical error: dataMgr is nil - app not properly initialized")
+		sys.LogError(errors.New("Critical error: dataMgr is nil - app not properly initialized"))
+		os.Exit(1)
 	}
 	return a.dataMgr.GetActiveThread()
 }
@@ -168,7 +171,7 @@ func (a *App) IncrementCurrentThreadFrequency(link *models.Superlink) {
 
 	edit := &editstack.Edit{ID: thread.ID, EditType: editstack.UpdateThread}
 	if err := a.editMgr.AddEdit(edit, link); err != nil {
-		log.Printf("Error tracking thread frequency increment: %v", err)
+		sys.LogError(err)
 	}
 }
 
@@ -218,7 +221,7 @@ func (a *App) SetCurrentThreadName(name string, link *models.Superlink) {
 
 	edit := &editstack.Edit{ID: thread.ID, EditType: editstack.UpdateThread}
 	if err := a.editMgr.AddEdit(edit, link); err != nil {
-		log.Printf("Error tracking thread update: %v", err)
+		sys.LogError(err)
 	}
 }
 
@@ -250,7 +253,7 @@ func (a *App) SetCurrentThreadSummary(summary string, link *models.Superlink) {
 
 	edit := &editstack.Edit{ID: thread.ID, EditType: editstack.UpdateThread}
 	if err := a.editMgr.AddEdit(edit, link); err != nil {
-		log.Printf("Error tracking thread update: %v", err)
+		sys.LogError(err)
 	}
 }
 
@@ -288,7 +291,7 @@ func (a *App) ToggleCurrentThreadHighlight(link *models.Superlink) {
 
 	edit := &editstack.Edit{ID: thread.ID, EditType: editstack.UpdateThread}
 	if err := a.editMgr.AddEdit(edit, link); err != nil {
-		log.Printf("Error tracking thread update: %v", err)
+		sys.LogError(err)
 	}
 }
 
@@ -308,7 +311,7 @@ func (a *App) ToggleCurrentThreadPrivate(link *models.Superlink) {
 
 	edit := &editstack.Edit{ID: thread.ID, EditType: editstack.UpdateThread}
 	if err := a.editMgr.AddEdit(edit, link); err != nil {
-		log.Printf("Error tracking thread update: %v", err)
+		sys.LogError(err)
 	}
 }
 
@@ -331,7 +334,7 @@ func (a *App) DeleteCurrentThread(link *models.Superlink) {
 	if threadID != 0 {
 		deleteEdit := &editstack.Edit{ID: threadID, EditType: editstack.DeleteThread}
 		if err := a.editMgr.AddEdit(deleteEdit, link); err != nil {
-			log.Printf("Error tracking thread deletion: %v", err)
+			sys.LogError(err)
 			return
 		}
 	}

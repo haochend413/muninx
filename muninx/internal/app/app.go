@@ -1,7 +1,7 @@
 package app
 
 import (
-	"log"
+	"errors"
 	"sync"
 	"time"
 
@@ -12,6 +12,7 @@ import (
 	"github.com/haochend413/muninx/internal/db"
 	"github.com/haochend413/muninx/internal/models"
 	"github.com/haochend413/muninx/state"
+	"github.com/haochend413/muninx/sys"
 )
 
 // App encapsulates application logic and state.
@@ -59,7 +60,8 @@ func (a *App) loadData() {
 		make(map[editstack.EditKey]*editstack.Edit),
 	)
 	if err != nil {
-		log.Panic(err)
+		sys.LogError(err)
+		panic(err)
 	}
 	a.dataMgr = data.NewDataMgr(threads)
 }
@@ -75,7 +77,7 @@ func (a *App) CreateNewThread(link *models.Superlink) {
 	thread.UpdatedAt = time.Now()
 
 	if err := a.db.CreateThread(thread); err != nil {
-		log.Printf("Error creating thread: %v", err)
+		sys.LogError(err)
 		return
 	}
 	a.Synced = false
@@ -90,7 +92,7 @@ func (a *App) CreateNewBranch(link *models.Superlink) {
 
 	thread := a.dataMgr.GetActiveThread()
 	if thread == nil {
-		log.Printf("Cannot create branch: no active thread")
+		sys.LogError(errors.New("Cannot create branch: no active thread"))
 		return
 	}
 
@@ -100,7 +102,7 @@ func (a *App) CreateNewBranch(link *models.Superlink) {
 	branch.ThreadID = thread.ID
 
 	if err := a.db.CreateBranch(branch); err != nil {
-		log.Printf("Error creating branch: %v", err)
+		sys.LogError(err)
 		return
 	}
 	a.Synced = false
@@ -116,11 +118,11 @@ func (a *App) CreateNewNote(link *models.Superlink) {
 	thread := a.dataMgr.GetActiveThread()
 	branch := a.dataMgr.GetActiveBranch()
 	if thread == nil {
-		log.Printf("Cannot create note: no active thread")
+		sys.LogError(errors.New("Cannot create note: no active thread"))
 		return
 	}
 	if branch == nil {
-		log.Printf("Cannot create note: no active branch")
+		sys.LogError(errors.New("Cannot create note: no active branch"))
 		return
 	}
 
@@ -131,7 +133,7 @@ func (a *App) CreateNewNote(link *models.Superlink) {
 	note.Branches = []*models.Branch{branch}
 
 	if err := a.db.CreateNote(note); err != nil {
-		log.Printf("Error creating note: %v", err)
+		sys.LogError(err)
 		return
 	}
 	a.Synced = false
@@ -140,21 +142,24 @@ func (a *App) CreateNewNote(link *models.Superlink) {
 
 func (a *App) GetThreadList() []*models.Thread {
 	if a == nil {
-		log.Panic("null app")
+		sys.LogError(errors.New("null app"))
+		panic("null app")
 	}
 	return a.dataMgr.GetThreads()
 }
 
 func (a *App) GetActiveBranchList() []*models.Branch {
 	if a == nil {
-		log.Panic("null app")
+		sys.LogError(errors.New("null app"))
+		panic("null app")
 	}
 	return a.dataMgr.GetActiveBranchList()
 }
 
 func (a *App) GetActiveNoteList() []*models.Note {
 	if a == nil {
-		log.Panic("null app")
+		sys.LogError(errors.New("null app"))
+		panic("null app")
 	}
 	return a.dataMgr.GetActiveNoteList()
 }
@@ -184,7 +189,7 @@ func (a *App) SyncWithDatabase() {
 
 	updatedThreads, err := a.db.SyncData(threads, editMapCopy)
 	if err != nil {
-		log.Printf("Error syncing with database: %v", err)
+		sys.LogError(err)
 		return
 	}
 

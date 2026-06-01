@@ -2,7 +2,6 @@ package db
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/haochend413/muninx/internal/clients"
 	"github.com/haochend413/muninx/internal/models"
+	"github.com/haochend413/muninx/sys"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -30,7 +30,7 @@ func NewDB(path string, embedClient *clients.EmbedClient) (*DB, error) {
 		// Config file doesn't exist, create directory and config file with defaults
 		dir := filepath.Dir(path)
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating database directory: %v", err)
+			sys.LogError(err)
 			return nil, err
 		}
 

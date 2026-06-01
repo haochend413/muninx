@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"github.com/haochend413/muninx/internal/models"
+	"github.com/haochend413/muninx/sys"
 )
 
 const EmbeddingDim = 1024
@@ -30,7 +31,9 @@ func (d *DB) InitVectorTable() error {
 
 	var version string
 	if err := sqlDB.QueryRow(`SELECT vec_version()`).Scan(&version); err != nil {
-		return fmt.Errorf("sqlite-vec not loaded: %w", err)
+		wrappedErr := fmt.Errorf("sqlite-vec not loaded: %w", err)
+		sys.LogError(wrappedErr)
+		return wrappedErr
 	}
 
 	_, err = sqlDB.Exec(`
@@ -43,7 +46,9 @@ CREATE VIRTUAL TABLE IF NOT EXISTS note_vecs USING vec0(
 
 func (d *DB) UpsertNoteEmbedding(noteID uint, embedding []float32) error {
 	if len(embedding) != EmbeddingDim {
-		return fmt.Errorf("embedding dim mismatch: got %d, want %d", len(embedding), EmbeddingDim)
+		err := fmt.Errorf("embedding dim mismatch: got %d, want %d", len(embedding), EmbeddingDim)
+		sys.LogError(err)
+		return err
 	}
 
 	b, err := json.Marshal(embedding)
@@ -81,7 +86,9 @@ func (d *DB) GetNoteEmbedding(noteID uint) ([]float32, error) {
 	}
 
 	if len(blob)%4 != 0 {
-		return nil, fmt.Errorf("unexpected embedding blob length: %d bytes", len(blob))
+		err := fmt.Errorf("unexpected embedding blob length: %d bytes", len(blob))
+		sys.LogError(err)
+		return nil, err
 	}
 	embedding := make([]float32, len(blob)/4)
 	for i := range embedding {
@@ -93,7 +100,9 @@ func (d *DB) GetNoteEmbedding(noteID uint) ([]float32, error) {
 
 func (d *DB) SearchRelatedNotes(queryEmbedding []float32, k int) ([]models.Note, error) {
 	if len(queryEmbedding) != EmbeddingDim {
-		return nil, fmt.Errorf("embedding dim mismatch: got %d, want %d", len(queryEmbedding), EmbeddingDim)
+		err := fmt.Errorf("embedding dim mismatch: got %d, want %d", len(queryEmbedding), EmbeddingDim)
+		sys.LogError(err)
+		return nil, err
 	}
 
 	b, err := json.Marshal(queryEmbedding)

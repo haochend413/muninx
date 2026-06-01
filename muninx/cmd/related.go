@@ -1,18 +1,22 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/haochend413/muninx/internal/models"
+	"github.com/haochend413/muninx/sys"
 	"github.com/spf13/cobra"
 )
 
 func resetAndReembedAllNotes() error {
 	if globalEmbedClient == nil {
-		return fmt.Errorf("no embedding client configured")
+		err := fmt.Errorf("no embedding client configured")
+		sys.LogError(err)
+		return err
 	}
 
 	sqlDB, err := globalDB.Conn.DB()
@@ -50,11 +54,15 @@ CREATE VIRTUAL TABLE note_vecs USING vec0(
 
 		vec, err := globalEmbedClient.Embed(content)
 		if err != nil {
-			return fmt.Errorf("embed failed for note %d: %w", note.ID, err)
+			wrappedErr := fmt.Errorf("embed failed for note %d: %w", note.ID, err)
+			sys.LogError(wrappedErr)
+			return wrappedErr
 		}
 
 		if err := globalDB.UpsertNoteEmbedding(note.ID, vec); err != nil {
-			return fmt.Errorf("upsert failed for note %d: %w", note.ID, err)
+			wrappedErr := fmt.Errorf("upsert failed for note %d: %w", note.ID, err)
+			sys.LogError(wrappedErr)
+			return wrappedErr
 		}
 
 		count++
@@ -76,20 +84,20 @@ var RelatedNotesCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id, err := strconv.ParseUint(args[0], 10, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Invalid note ID %q: %v\n", args[0], err)
+			sys.LogError(fmt.Errorf("Invalid note ID %q: %v", args[0], err))
 			os.Exit(1)
 		}
 
 		if relatedResetReembed {
 			if err := resetAndReembedAllNotes(); err != nil {
-				fmt.Fprintf(os.Stderr, "Reset/re-embed failed: %v\n", err)
+				sys.LogError(err)
 				os.Exit(1)
 			}
 		}
 
 		var note models.Note
 		if err := globalDB.Conn.First(&note, uint(id)).Error; err != nil {
-			fmt.Fprintf(os.Stderr, "Note %d not found: %v\n", id, err)
+			sys.LogError(fmt.Errorf("Note %d not found: %v", id, err))
 			os.Exit(1)
 		}
 
@@ -102,24 +110,24 @@ var RelatedNotesCmd = &cobra.Command{
 
 		embedding, err := globalDB.GetNoteEmbedding(note.ID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to fetch cached embedding: %v\n", err)
+			sys.LogError(err)
 			os.Exit(1)
 		}
 		if embedding == nil {
 			if globalEmbedClient == nil {
-				fmt.Fprintln(os.Stderr, "No cached embedding and no embedding client configured")
+				sys.LogError(errors.New("No cached embedding and no embedding client configured"))
 				os.Exit(1)
 			}
 			embedding, err = globalEmbedClient.Embed(note.Content)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Embedding failed: %v\n", err)
+				sys.LogError(err)
 				os.Exit(1)
 			}
 		}
 
 		results, err := globalDB.SearchRelatedNotes(embedding, 6)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Search failed: %v\n", err)
+			sys.LogError(err)
 			os.Exit(1)
 		}
 

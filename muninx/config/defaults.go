@@ -65,6 +65,11 @@ func DataFilePathDefault() string {
 	return basePath + "/db"
 }
 
+func ErrorFilePathDefualt() string {
+	basePath, _ := BasePathDefault()
+	return basePath + "/error.log"
+}
+
 func ConfigPath() string {
 	basePath, _ := BasePathDefault()
 	return basePath + "/config.yaml"

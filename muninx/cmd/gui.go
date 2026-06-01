@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
+	"github.com/haochend413/muninx/sys"
 	"github.com/spf13/cobra"
 )
 
@@ -28,15 +30,14 @@ var LaunchGUICmd = &cobra.Command{
 			} else if _, err := exec.LookPath("yum"); err == nil {
 				installNode = exec.Command("sudo", "yum", "install", "-y", "nodejs", "npm")
 			} else {
-				fmt.Fprintf(os.Stderr, "Could not find a package manager to install Node.js\n")
-				fmt.Fprintf(os.Stderr, "Please install manually from https://nodejs.org/\n")
+				sys.LogError(errors.New("Could not find a package manager to install Node.js"))
 				return
 			}
 
 			installNode.Stdout = os.Stdout
 			installNode.Stderr = os.Stderr
 			if err := installNode.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to install Node.js: %v\n", err)
+				sys.LogError(fmt.Errorf("Failed to install Node.js: %v", err))
 				return
 			}
 			fmt.Println("Node.js installed successfully!")
@@ -53,7 +54,7 @@ var LaunchGUICmd = &cobra.Command{
 			installPnpm.Stdout = os.Stdout
 			installPnpm.Stderr = os.Stderr
 			if err := installPnpm.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to install pnpm: %v\n", err)
+				sys.LogError(fmt.Errorf("Failed to install pnpm: %v", err))
 				return
 			}
 			fmt.Println("pnpm installed successfully!")
@@ -63,7 +64,7 @@ var LaunchGUICmd = &cobra.Command{
 
 		guiDir, err := filepath.Abs("../gui")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error resolving gui path: %v\n", err)
+			sys.LogError(err)
 			return
 		}
 
@@ -72,7 +73,7 @@ var LaunchGUICmd = &cobra.Command{
 		cmd1.Stdout = os.Stdout
 		cmd1.Stderr = os.Stderr
 		if err := cmd1.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error installing pnpm packages: %v\n", err)
+			sys.LogError(err)
 			return
 		}
 
@@ -82,7 +83,7 @@ var LaunchGUICmd = &cobra.Command{
 		cmd2.Stderr = os.Stderr
 		fmt.Println("Starting GUI at:", guiDir)
 		if err := cmd2.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running pnpm dev: %v\n", err)
+			sys.LogError(err)
 			return
 		}
 	},

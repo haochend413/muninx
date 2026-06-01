@@ -1,12 +1,14 @@
 package app
 
 import (
-	"log"
+	"errors"
+	"os"
 	"time"
 
 	editstack "github.com/haochend413/muninx/internal/app/editStack"
 	"github.com/haochend413/muninx/internal/models"
 	"github.com/sergi/go-diff/diffmatchpatch"
+	"github.com/haochend413/muninx/sys"
 )
 
 // current_note.go provides a controlled interface for accessing and modifying
@@ -18,7 +20,8 @@ import (
 
 func (a *App) getCurrentNote() *models.Note {
 	if a.dataMgr == nil {
-		log.Fatal("Critical error: dataMgr is nil - app not properly initialized")
+		sys.LogError(errors.New("Critical error: dataMgr is nil - app not properly initialized"))
+		os.Exit(1)
 	}
 	return a.dataMgr.GetActiveNote()
 }
@@ -161,7 +164,7 @@ func (a *App) SetCurrentNoteContent(content string, link *models.Superlink) {
 
 	edit := &editstack.Edit{ID: note.ID, EditType: editstack.UpdateNote}
 	if err := a.editMgr.AddEdit(edit, link); err != nil {
-		log.Printf("Error tracking note update: %v", err)
+		sys.LogError(err)
 	}
 }
 
@@ -240,7 +243,7 @@ func (a *App) ToggleCurrentNoteHighlight(link *models.Superlink) {
 
 	edit := &editstack.Edit{ID: note.ID, EditType: editstack.UpdateNote}
 	if err := a.editMgr.AddEdit(edit, link); err != nil {
-		log.Printf("Error tracking note update: %v", err)
+		sys.LogError(err)
 	}
 }
 
@@ -260,7 +263,7 @@ func (a *App) ToggleCurrentNotePrivate(link *models.Superlink) {
 
 	edit := &editstack.Edit{ID: note.ID, EditType: editstack.UpdateNote}
 	if err := a.editMgr.AddEdit(edit, link); err != nil {
-		log.Printf("Error tracking note update: %v", err)
+		sys.LogError(err)
 	}
 }
 
@@ -284,7 +287,7 @@ func (a *App) DeleteCurrentNote(link *models.Superlink) {
 	if noteID != 0 {
 		deleteEdit := &editstack.Edit{ID: noteID, EditType: editstack.DeleteNote}
 		if err := a.editMgr.AddEdit(deleteEdit, link); err != nil {
-			log.Printf("Error tracking note deletion: %v", err)
+			sys.LogError(err)
 			return
 		}
 	}

@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/haochend413/muninx/internal/models"
+	"github.com/haochend413/muninx/sys"
 )
 
 type EditType = int
@@ -112,42 +113,54 @@ func (em *EditMgr) AddEdit(curr *Edit, spl *models.Superlink) error {
 			case UpdateNote:
 				em.NoteEditStack = AppendNoteEdit(em.NoteEditStack, &ne)
 			case DeleteNote:
-				return fmt.Errorf("cannot update note %d: already marked for deletion", id)
+				err := fmt.Errorf("cannot update note %d: already marked for deletion", id)
+				sys.LogError(err)
+				return err
 			}
 		case DeleteNote:
 			switch prev {
 			case UpdateNote:
 				em.EditMap[key].EditType = DeleteNote
 			case DeleteNote:
-				return fmt.Errorf("duplicate delete for note %d", id)
+				err := fmt.Errorf("duplicate delete for note %d", id)
+				sys.LogError(err)
+				return err
 			}
 		case UpdateThread:
 			switch prev {
 			case UpdateThread:
 				// idempotent
 			case DeleteThread:
-				return fmt.Errorf("cannot update thread %d: already marked for deletion", id)
+				err := fmt.Errorf("cannot update thread %d: already marked for deletion", id)
+				sys.LogError(err)
+				return err
 			}
 		case DeleteThread:
 			switch prev {
 			case UpdateThread:
 				em.EditMap[key].EditType = DeleteThread
 			case DeleteThread:
-				return fmt.Errorf("duplicate delete for thread %d", id)
+				err := fmt.Errorf("duplicate delete for thread %d", id)
+				sys.LogError(err)
+				return err
 			}
 		case UpdateBranch:
 			switch prev {
 			case UpdateBranch:
 				// idempotent
 			case DeleteBranch:
-				return fmt.Errorf("cannot update branch %d: already marked for deletion", id)
+				err := fmt.Errorf("cannot update branch %d: already marked for deletion", id)
+				sys.LogError(err)
+				return err
 			}
 		case DeleteBranch:
 			switch prev {
 			case UpdateBranch:
 				em.EditMap[key].EditType = DeleteBranch
 			case DeleteBranch:
-				return fmt.Errorf("duplicate delete for branch %d", id)
+				err := fmt.Errorf("duplicate delete for branch %d", id)
+				sys.LogError(err)
+				return err
 			}
 		}
 	} else {

@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"log"
+	"fmt"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -126,7 +126,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.SyncWithDatabase()
 			if s != nil {
 				if err := statePkg.SaveState(cfg.StateFilePath, s); err != nil {
-					log.Printf("error saving state: %v", err)
+					sys.LogError(fmt.Errorf("error saving state: %v", err))
 				}
 			}
 			return quitSyncDoneMsg{}
