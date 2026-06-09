@@ -24,15 +24,16 @@ func (m Model) View() tea.View {
 	case QuitConfirmView:
 		content = m.quitConfirm.RenderContent()
 	case FindNoteView:
-		var bgContent string
+		// Render the background view, then composite the overlay on top of it.
+		// Background views now fill the full screen, so the overlay is never clipped.
+		var bg string
 		switch m.findPreviousView {
 		case WriteView:
-			bgContent = m.write.RenderContent()
+			bg = m.write.RenderContent()
 		default:
-			bgContent = m.menu.RenderContent()
+			bg = m.menu.RenderContent()
 		}
-		overlay := m.findNote.RenderOverlay()
-		content = placeOverlay(m.findNote.MarginX(), m.findNote.MarginY(), overlay, bgContent)
+		content = placeOverlay(m.findNote.MarginX(), m.findNote.MarginY(), m.findNote.RenderOverlay(), bg)
 	default:
 		content = m.menu.RenderContent()
 	}
@@ -42,7 +43,7 @@ func (m Model) View() tea.View {
 	return v
 }
 
-// placeOverlay composites fg on top of bg, placing fg's top-left at (x, y).
+// placeOverlay composites fg on top of bg, placing fg's top-left corner at (x, y).
 func placeOverlay(x, y int, fg, bg string) string {
 	fgLines := strings.Split(fg, "\n")
 	bgLines := strings.Split(bg, "\n")
@@ -66,7 +67,6 @@ func placeOverlay(x, y int, fg, bg string) string {
 		}
 
 		right := ansi.TruncateLeft(bgLine, x+fgW, "")
-
 		result[row] = left + fgLine + right
 	}
 

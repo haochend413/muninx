@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/haochend413/bubbles/v2/key"
 
 	"github.com/haochend413/muninx/internal/app"
 	"github.com/haochend413/muninx/internal/ui/findnote"
@@ -13,6 +14,22 @@ import (
 	statePkg "github.com/haochend413/muninx/state"
 	"github.com/haochend413/muninx/sys"
 )
+
+// reEmbedDoneMsg is sent when a full re-embed completes.
+type reEmbedDoneMsg struct{}
+
+var globalKeys = struct {
+	ReEmbed key.Binding
+}{
+	ReEmbed: key.NewBinding(key.WithKeys("ctrl+r")),
+}
+
+func reEmbedCmd(a *app.App) tea.Cmd {
+	return func() tea.Msg {
+		a.ReEmbedAllNotes()
+		return reEmbedDoneMsg{}
+	}
+}
 
 // syncDoneMsg is sent when a background sync completes normally.
 type syncDoneMsg struct{}
@@ -29,6 +46,13 @@ func syncCmd(a *app.App) tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Intercept global keys before delegating to sub-models.
+	if kMsg, ok := msg.(tea.KeyMsg); ok {
+		if key.Matches(kMsg, globalKeys.ReEmbed) {
+			return m, reEmbedCmd(m.app)
+		}
+	}
+
 	// Global messages handled before view-mode dispatch.
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -49,6 +73,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case syncDoneMsg:
 		m.menu.UpdateTable()
+		return m, nil
+
+	case reEmbedDoneMsg:
 		return m, nil
 
 	case quitSyncDoneMsg:

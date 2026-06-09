@@ -164,6 +164,15 @@ func (a *App) GetActiveNoteList() []*models.Note {
 	return a.dataMgr.GetActiveNoteList()
 }
 
+// ReEmbedAllNotes re-embeds every note in the dataset. Runs synchronously;
+// call from a goroutine (tea.Cmd) to avoid blocking the UI.
+func (a *App) ReEmbedAllNotes() {
+	if a.embedder == nil {
+		return
+	}
+	a.embedder.ReEmbedAll(a.dataMgr.GetAllNotesByIDDesc())
+}
+
 // FetchRelatedNotes returns the k most semantically related notes for a given noteID.
 func (a *App) FetchRelatedNotes(noteID uint, k int) []models.Note {
 	if a.embedder == nil {

@@ -2,13 +2,16 @@ package write
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/haochend413/bubbles/v2/key"
 	"github.com/haochend413/bubbles/v2/textarea_vim"
 	"github.com/haochend413/lipgloss/v2"
 	"github.com/haochend413/muninx/internal/app"
 	"github.com/haochend413/muninx/internal/models"
-	uiList "github.com/haochend413/muninx/internal/ui/list"
+	"github.com/haochend413/muninx/internal/ui/viewport"
 )
 
 // Messages sent to the root model.
@@ -18,35 +21,52 @@ type OpenQuitMsg struct{}
 type SyncRequestMsg struct{}
 type OpenNoteMsg struct{ Note *models.Note }
 
+// tickMsg drives the typewriter animation. gen guards against stale ticks.
+type tickMsg struct{ gen int }
+
+const tickInterval = 80 * time.Millisecond
+
+func doTick(gen int) tea.Cmd {
+	return tea.Tick(tickInterval, func(t time.Time) tea.Msg {
+		return tickMsg{gen: gen}
+	})
+}
+
 // Focus tracks which panel has keyboard focus.
 type Focus int
 
 const (
 	FocusTextArea Focus = iota
-	FocusList
+	FocusRelated
 )
 
-// RelatedNoteItem implements list.DefaultItem for the related-notes panel.
-type RelatedNoteItem struct {
-	NoteID  uint
-	Content string
+// relatedNoteEntry holds the data needed to render one related note.
+type relatedNoteEntry struct {
+	content   string
+	updatedAt time.Time
 }
 
-func (r RelatedNoteItem) FilterValue() string { return r.Content }
-func (r RelatedNoteItem) Title() string       { return fmt.Sprintf("#%d", r.NoteID) }
-func (r RelatedNoteItem) Description() string {
-	if len(r.Content) > 100 {
-		return r.Content[:97] + "..."
-	}
-	return r.Content
-}
+// Per-element styles. Colors are embedded directly in the viewport content so
+// they survive independently of any outer lipgloss wrapper.
+var (
+	noteTextDimStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	noteTextLitStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	timestampDimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	timestampLitStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+)
 
 type Model struct {
-	app         *app.App
-	textArea    textarea_vim.Model
-	relatedList uiList.Model
-	focus       Focus
-	layout      Layout
+	app       *app.App
+	textArea  textarea_vim.Model
+	relatedVp viewport.Model
+	focus     Focus
+	layout    Layout
+
+	// Typewriter state
+	relatedNotes  []relatedNoteEntry // metadata for each note (content + time)
+	relatedText   string             // plain concatenated text, used to count revealedChars
+	revealedChars int
+	tickGen       int
 }
 
 func New(application *app.App) Model {
@@ -57,47 +77,121 @@ func New(application *app.App) Model {
 	taStyles.Blurred.CursorLine = cursorStyle
 	ta.SetStyles(taStyles)
 	ta.Placeholder = "Start writing..."
+	ta.ShowLineNumbers = false
+	ta.Statusbar = nil
+	// Disable vim mode switching — always stay in insert mode.
+	ta.KeyMap.EnterViewMode = key.NewBinding()
+	ta.KeyMap.EnterInsertMode = key.NewBinding()
 	ta.SetWidth(60)
 	ta.SetHeight(20)
 
-	delegate := uiList.NewDefaultDelegate()
-	delegate.ShowDescription = true
-	relatedList := uiList.New([]uiList.Item{}, delegate, 40, 20)
-	relatedList.Title = "Related Notes"
-	relatedList.SetShowHelp(false)
-	relatedList.SetShowStatusBar(false)
-	relatedList.SetShowFilter(false)
-	relatedList.DisableQuitKeybindings()
+	vp := viewport.New()
+	vp.SoftWrap = true
 
 	return Model{
-		app:         application,
-		textArea:    ta,
-		relatedList: relatedList,
-		focus:       FocusTextArea,
+		app:       application,
+		textArea:  ta,
+		relatedVp: vp,
+		focus:     FocusTextArea,
 	}
 }
 
 func (m Model) Init() tea.Cmd { return nil }
 
-// applyLayout pushes the current layout dimensions into all components.
+// applyLayout pushes layout dimensions into both panels.
 func (m *Model) applyLayout() {
-	l := m.layout
-	m.relatedList.SetWidth(l.ListWidth)
-	m.relatedList.SetHeight(l.ListHeight)
-	m.textArea.SetWidth(l.TextAreaWidth)
-	m.textArea.SetHeight(l.TextAreaHeight)
+	m.textArea.SetWidth(m.layout.TextAreaWidth)
+	m.textArea.SetHeight(m.layout.WindowHeight)
+	m.relatedVp.SetWidth(m.layout.RelatedWidth)
+	m.relatedVp.SetHeight(m.layout.WindowHeight)
 }
 
-// LoadNote sets up the editor for the given note.
+// renderLines renders each line of s with style independently, preventing
+// lipgloss from padding shorter lines to match the longest line (which would
+// create blank rows in the viewport when soft-wrap is active).
+func renderLines(s string, style lipgloss.Style) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = style.Render(l)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// buildStyledContent constructs the viewport string with per-element ANSI colors.
+// Note text and timestamp each get their own color; the focus state selects the
+// brightness level.
+func (m *Model) buildStyledContent() string {
+	focused := m.focus == FocusRelated
+	var textStyle, tsStyle lipgloss.Style
+	if focused {
+		textStyle = noteTextLitStyle
+		tsStyle = timestampLitStyle
+	} else {
+		textStyle = noteTextDimStyle
+		tsStyle = timestampDimStyle
+	}
+
+	remaining := m.revealedChars
+	const sep = "\n\n"
+	sepRunes := []rune(sep)
+	var sb strings.Builder
+
+	for i, entry := range m.relatedNotes {
+		if remaining <= 0 {
+			break
+		}
+		// Insert separator between notes (counts toward revealedChars).
+		if i > 0 {
+			if remaining >= len(sepRunes) {
+				sb.WriteString(sep)
+				remaining -= len(sepRunes)
+			} else {
+				sb.WriteString(string(sepRunes[:remaining]))
+				remaining = 0
+				break
+			}
+		}
+
+		noteRunes := []rune(entry.content)
+		if remaining >= len(noteRunes) {
+			// Whole note revealed — append content then styled timestamp.
+			sb.WriteString(renderLines(entry.content, textStyle))
+			sb.WriteString("\n")
+			ts := "(Last Updated at: unknown)"
+			if !entry.updatedAt.IsZero() {
+				ts = fmt.Sprintf("(Last Updated at: %s)", entry.updatedAt.Format("2006-01-02 15:04"))
+			}
+			sb.WriteString(tsStyle.Render(ts))
+			remaining -= len(noteRunes)
+		} else {
+			// Partially revealed.
+			sb.WriteString(renderLines(string(noteRunes[:remaining]), textStyle))
+			remaining = 0
+		}
+	}
+
+	return sb.String()
+}
+
+// updateRelatedViewport rebuilds the styled viewport content from the current
+// reveal position.
+func (m *Model) updateRelatedViewport() {
+	m.relatedVp.SetContent(m.buildStyledContent())
+}
+
+// LoadNote sets up the editor for the given note and starts the typewriter.
 func (m *Model) LoadNote(note *models.Note) tea.Cmd {
 	if note == nil {
 		return nil
 	}
 	m.textArea.SetValue(note.Content)
-	cmd := m.textArea.Focus()
+	focusCmd := m.textArea.Focus()
 	m.focus = FocusTextArea
 	m.loadRelatedNotes(note.ID)
-	return cmd
+	if m.relatedText != "" {
+		return tea.Batch(focusCmd, doTick(m.tickGen))
+	}
+	return focusCmd
 }
 
 // SaveCurrentNote persists the textarea content to the active note.
@@ -118,25 +212,55 @@ func (m *Model) SaveCurrentNote() {
 	m.app.IncrementCurrentBranchFrequency(nil)
 }
 
-func (m *Model) loadRelatedNotes(noteID uint) {
-	related := m.app.FetchRelatedNotes(noteID, 10)
-	items := make([]uiList.Item, 0, len(related))
-	for _, n := range related {
-		items = append(items, RelatedNoteItem{
-			NoteID:  n.ID,
-			Content: n.Content,
-		})
+// trimEmptyLines removes lines whose content is entirely whitespace.
+func trimEmptyLines(s string) string {
+	lines := strings.Split(s, "\n")
+	out := lines[:0]
+	for _, l := range lines {
+		if strings.TrimSpace(l) != "" {
+			out = append(out, l)
+		}
 	}
-	m.relatedList.SetItems(items)
+	return strings.Join(out, "\n")
 }
 
-// ToggleFocus flips focus between the textarea and the related-notes list.
-func (m *Model) ToggleFocus() tea.Cmd {
-	if m.focus == FocusTextArea {
-		m.focus = FocusList
-		m.textArea.Blur()
-		return nil
+// loadRelatedNotes fetches related notes and builds the relatedNotes slice and
+// plain relatedText string. Incrementing tickGen invalidates any in-flight tick.
+func (m *Model) loadRelatedNotes(noteID uint) {
+	related := m.app.FetchRelatedNotes(noteID, 10)
+	currentContent := m.textArea.Value()
+
+	m.relatedNotes = m.relatedNotes[:0]
+	var textSb strings.Builder
+	written := 0
+
+	for _, n := range related {
+		if n.ID == noteID || n.Content == currentContent {
+			continue
+		}
+		// Choose the best available timestamp.
+		t := n.UpdatedAt
+		if !n.LastEdit.IsZero() {
+			t = n.LastEdit
+		}
+		cleaned := trimEmptyLines(n.Content)
+		if cleaned == "" {
+			continue
+		}
+		if written > 0 {
+			textSb.WriteString("\n\n")
+		}
+		textSb.WriteString(cleaned)
+		m.relatedNotes = append(m.relatedNotes, relatedNoteEntry{
+			content:   cleaned,
+			updatedAt: t,
+		})
+		written++
 	}
-	m.focus = FocusTextArea
-	return m.textArea.Focus()
+
+	m.relatedText = textSb.String()
+	m.revealedChars = 0
+	m.tickGen++
+	m.relatedVp.SetContent("")
+	m.relatedVp.SetYOffset(0)
 }

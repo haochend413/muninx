@@ -23,6 +23,19 @@ func (e *Embedder) EmbedNote(noteID uint, text string) error {
 	return e.db.UpsertNoteEmbedding(noteID, vec)
 }
 
+// ReEmbedAll re-embeds every provided note. No-ops silently if the embed client
+// is unavailable.
+func (e *Embedder) ReEmbedAll(notes []*models.Note) {
+	if e.client == nil {
+		return
+	}
+	for _, n := range notes {
+		if n.Content != "" {
+			e.EmbedNote(n.ID, n.Content) //nolint:errcheck — best-effort
+		}
+	}
+}
+
 func (e *Embedder) FetchRelated(noteID uint, k int) []models.Note {
 	embedding, err := e.db.GetNoteEmbedding(noteID)
 	if err != nil {
