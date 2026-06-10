@@ -69,6 +69,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		return m, tick()
 
+	// Always forward typewriter ticks to the write model so the animation
+	// continues regardless of which view is currently active.
+	case write.TickMsg:
+		var cmd tea.Cmd
+		m.write, cmd = m.write.Update(msg)
+		return m, cmd
+
 	// --- Async sync completion ---
 
 	case syncDoneMsg:

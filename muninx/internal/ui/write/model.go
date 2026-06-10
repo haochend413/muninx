@@ -21,14 +21,16 @@ type OpenQuitMsg struct{}
 type SyncRequestMsg struct{}
 type OpenNoteMsg struct{ Note *models.Note }
 
-// tickMsg drives the typewriter animation. gen guards against stale ticks.
-type tickMsg struct{ gen int }
+// TickMsg drives the typewriter animation. Gen guards against stale ticks.
+// Exported so the root model can intercept it and always route it here,
+// keeping the animation alive regardless of which view is currently active.
+type TickMsg struct{ Gen int }
 
 const tickInterval = 80 * time.Millisecond
 
 func doTick(gen int) tea.Cmd {
 	return tea.Tick(tickInterval, func(t time.Time) tea.Msg {
-		return tickMsg{gen: gen}
+		return TickMsg{Gen: gen}
 	})
 }
 

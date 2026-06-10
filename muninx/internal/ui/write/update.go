@@ -30,8 +30,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.applyLayout()
 		return m, nil
 
-	case tickMsg:
-		if msg.gen != m.tickGen {
+	case TickMsg:
+		if msg.Gen != m.tickGen {
 			return m, nil // stale tick from a previous note load
 		}
 		runes := []rune(m.relatedText)
