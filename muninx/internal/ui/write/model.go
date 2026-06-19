@@ -181,6 +181,21 @@ func (m *Model) updateRelatedViewport() {
 	m.relatedVp.SetContent(m.buildStyledContent())
 }
 
+// RefreshRelatedNotes re-fetches related notes for the currently open note and
+// restarts the typewriter animation. Call this after a re-embed completes so
+// the related panel reflects the updated embeddings.
+func (m *Model) RefreshRelatedNotes() tea.Cmd {
+	noteID := m.app.GetCurrentNoteID()
+	if noteID == 0 {
+		return nil
+	}
+	m.loadRelatedNotes(noteID)
+	if m.relatedText != "" {
+		return doTick(m.tickGen)
+	}
+	return nil
+}
+
 // LoadNote sets up the editor for the given note and starts the typewriter.
 func (m *Model) LoadNote(note *models.Note) tea.Cmd {
 	if note == nil {

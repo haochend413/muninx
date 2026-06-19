@@ -207,9 +207,6 @@ type StyleState struct {
 	Prompt           lipgloss.Style
 }
 
-func colorPtr(c string) *string {
-	return &c
-}
 
 func (s StyleState) computedCursorLine() lipgloss.Style {
 	return s.CursorLine.Inherit(s.Base).Inline(true)
@@ -387,18 +384,15 @@ func New() Model {
 	}
 
 	// Initialize statusbar
-	sb := statusbar.New(
-		statusbar.WithHeight(1),
-		statusbar.WithWidth(defaultWidth),
-	)
-	modeElem := sb.AddLeft(8, "INSERT")
-	modeElem.SetColors(colorPtr("0"), colorPtr("34"))
-	sb.SetTag(modeElem, "mode")
-
-	countElem := sb.AddLeft(25, "0 chars | 0 words")
-	countElem.SetColors(colorPtr("252"), colorPtr("236"))
-	sb.SetTag(countElem, "count")
-
+	sb := statusbar.New(defaultWidth, 1)
+	sb.Register("mode", statusbar.Left, statusbar.ElemConfig{
+		Width: 8, Fg: "0", Bg: "34", Align: statusbar.AlignCenter,
+	})
+	sb.Set("mode", "INSERT")
+	sb.Register("count", statusbar.Left, statusbar.ElemConfig{
+		Width: 25, Fg: "252", Bg: "236",
+	})
+	sb.Set("count", "0 chars | 0 words")
 	m.Statusbar = &sb
 
 	m.SetHeight(defaultHeight)
@@ -515,9 +509,8 @@ func (m *Model) InsertRune(r rune) {
 func (m *Model) SetInsertMode() {
 	m.InsertMode = true
 	if m.Statusbar != nil {
-		if elem := m.Statusbar.GetTag("mode"); elem != nil {
-			elem.SetValue("INSERT").SetColors(colorPtr("0"), colorPtr("34"))
-		}
+		m.Statusbar.Set("mode", "INSERT")
+		m.Statusbar.SetColors("mode", "0", "34")
 	}
 }
 
@@ -525,9 +518,8 @@ func (m *Model) SetInsertMode() {
 func (m *Model) SetViewMode() {
 	m.InsertMode = false
 	if m.Statusbar != nil {
-		if elem := m.Statusbar.GetTag("mode"); elem != nil {
-			elem.SetValue("VIEW").SetColors(colorPtr("0"), colorPtr("39"))
-		}
+		m.Statusbar.Set("mode", "VIEW")
+		m.Statusbar.SetColors("mode", "0", "39")
 	}
 }
 
@@ -536,17 +528,13 @@ func (m *Model) updateWordCount() {
 	if m.Statusbar == nil {
 		return
 	}
-	elem := m.Statusbar.GetTag("count")
-	if elem == nil {
-		return
-	}
 	text := m.Value()
 	chars := len([]rune(text))
 	words := 0
 	if len(strings.TrimSpace(text)) > 0 {
 		words = len(strings.Fields(text))
 	}
-	elem.SetValue(fmt.Sprintf("%d chars | %d words", chars, words))
+	m.Statusbar.Set("count", fmt.Sprintf("%d chars | %d words", chars, words))
 }
 
 // insertRunesFromUserInput inserts runes at the current cursor position.
@@ -1450,6 +1438,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	m.repositionView()
+
+	if m.Statusbar != nil {
+		var sbCmd tea.Cmd
+		*m.Statusbar, sbCmd = m.Statusbar.Update(msg)
+		cmds = append(cmds, sbCmd)
+	}
 
 	return m, tea.Batch(cmds...)
 }

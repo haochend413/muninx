@@ -83,7 +83,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case reEmbedDoneMsg:
-		return m, nil
+		cmd := m.write.RefreshRelatedNotes()
+		return m, cmd
 
 	case quitSyncDoneMsg:
 		return m, tea.Quit
