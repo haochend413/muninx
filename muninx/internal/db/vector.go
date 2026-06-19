@@ -68,6 +68,16 @@ func (d *DB) UpsertNoteEmbedding(noteID uint, embedding []float32) error {
 	return err
 }
 
+// DeleteNoteEmbedding removes the stored embedding for a note, if any.
+func (d *DB) DeleteNoteEmbedding(noteID uint) error {
+	sqlDB, err := d.rawDB()
+	if err != nil {
+		return err
+	}
+	_, err = sqlDB.Exec(`DELETE FROM note_vecs WHERE rowid = ?`, noteID)
+	return err
+}
+
 // GetNoteEmbedding fetches the stored embedding for a note. Returns nil with no error if the note
 // has no embedding yet (not yet synced to the vector table).
 func (d *DB) GetNoteEmbedding(noteID uint) ([]float32, error) {
@@ -138,7 +148,7 @@ LIMIT ?
 		}
 
 		var note models.Note
-		if err := d.Conn.Preload("Branches").First(&note, noteID).Error; err != nil {
+		if err := d.Conn.First(&note, noteID).Error; err != nil {
 			return nil, err
 		}
 

@@ -7,7 +7,6 @@ import (
 	"github.com/haochend413/bubbles/v2/key"
 
 	"github.com/haochend413/muninx/internal/app"
-	"github.com/haochend413/muninx/internal/ui/findnote"
 	"github.com/haochend413/muninx/internal/ui/menu"
 	"github.com/haochend413/muninx/internal/ui/quitconfirm"
 	"github.com/haochend413/muninx/internal/ui/write"
@@ -20,8 +19,10 @@ type reEmbedDoneMsg struct{}
 
 var globalKeys = struct {
 	ReEmbed key.Binding
+	Undo    key.Binding
 }{
 	ReEmbed: key.NewBinding(key.WithKeys("ctrl+r")),
+	Undo:    key.NewBinding(key.WithKeys("ctrl+z")),
 }
 
 func reEmbedCmd(a *app.App) tea.Cmd {
@@ -51,6 +52,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if key.Matches(kMsg, globalKeys.ReEmbed) {
 			return m, reEmbedCmd(m.app)
 		}
+		if key.Matches(kMsg, globalKeys.Undo) {
+			if m.app.UndoDelete() != nil {
+				m.menu.UpdateTable()
+			}
+			return m, nil
+		}
 	}
 
 	// Global messages handled before view-mode dispatch.
@@ -59,12 +66,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-		var wc1, wc2, wc3, wc4 tea.Cmd
+		var wc1, wc2, wc4 tea.Cmd
 		m.menu, wc1 = m.menu.Update(msg)
 		m.write, wc2 = m.write.Update(msg)
-		m.findNote, wc3 = m.findNote.Update(msg)
 		m.quitConfirm, wc4 = m.quitConfirm.Update(msg)
-		return m, tea.Batch(wc1, wc2, wc3, wc4)
+		return m, tea.Batch(wc1, wc2, wc4)
 
 	case tickMsg:
 		return m, tick()
@@ -102,12 +108,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case menu.NewNoteRequestMsg:
 		return m.handleNewNote()
 
+	case menu.DeleteNoteRequestMsg:
+		notes := m.app.GetDataMgr().GetAllNotesByIDDesc()
+		if msg.Index >= 0 && msg.Index < len(notes) {
+			m.app.DeleteNoteByID(notes[msg.Index].ID)
+			m.menu.UpdateTable()
+		}
+		return m, nil
+
 	case menu.SyncRequestMsg:
 		return m, syncCmd(m.app)
-
-	case menu.OpenFindNoteMsg:
-		m.openFindOverlay()
-		return m, nil
 
 	case menu.OpenQuitMsg:
 		m.previousViewMode = m.viewMode
@@ -122,10 +132,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switchToEnglish()
 		return m, nil
 
-	case write.OpenFindNoteMsg:
-		m.openFindOverlay()
-		return m, nil
-
 	case write.OpenQuitMsg:
 		m.previousViewMode = m.viewMode
 		m.viewMode = QuitConfirmView
@@ -137,17 +143,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case write.OpenNoteMsg:
 		cmd := m.loadNoteIntoEditor(msg.Note)
 		return m, cmd
-
-	// --- Messages from findnote sub-model ---
-
-	case findnote.NoteSelectedMsg:
-		m.write.SaveCurrentNote()
-		cmd := m.loadNoteIntoEditor(msg.Note)
-		return m, cmd
-
-	case findnote.CloseMsg:
-		m.viewMode = m.findPreviousView
-		return m, nil
 
 	// --- Messages from quitconfirm sub-model ---
 
@@ -179,8 +174,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.menu, cmd = m.menu.Update(msg)
 	case WriteView:
 		m.write, cmd = m.write.Update(msg)
-	case FindNoteView:
-		m.findNote, cmd = m.findNote.Update(msg)
 	case QuitConfirmView:
 		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
 	}

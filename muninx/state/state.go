@@ -13,18 +13,12 @@ import (
 )
 
 type UIState struct {
-	YOffsets_Thread map[context.ContextPtr]int `json:"yOffsets_thread"` // viewport scroll offsets per context
-	YOffsets_Branch map[context.ContextPtr]int `json:"yOffsets_branch"`
-	YOffsets_Note   map[context.ContextPtr]int `json:"yOffsets_note"`
+	YOffsets_Note map[context.ContextPtr]int `json:"yOffsets_note"` // viewport scroll offsets per context
 }
 
 type AppState struct {
-	LastThreadContext context.ContextPtr          `json:"lastThreadContext"` // previous context
-	LastBranchContext context.ContextPtr          `json:"lastBranchContext"`
-	LastNoteContext   context.ContextPtr          `json:"lastNoteContext"`
-	ThreadCursors     map[context.ContextPtr]uint `json:"thread_cursors"` // cursor positions per context
-	BranchCursors     map[context.ContextPtr]uint `json:"branch_cursors"`
-	NoteCursors       map[context.ContextPtr]uint `json:"note_cursors"`
+	LastNoteContext context.ContextPtr          `json:"lastNoteContext"` // previous context
+	NoteCursors     map[context.ContextPtr]uint `json:"note_cursors"`    // cursor positions per context
 }
 
 type State struct {
@@ -41,17 +35,6 @@ type State struct {
 func DefaultState() *State {
 	return &State{
 		UI: UIState{
-
-			YOffsets_Thread: map[context.ContextPtr]int{
-				context.Default: 0,
-				context.Recent:  0,
-				context.Search:  0,
-			},
-			YOffsets_Branch: map[context.ContextPtr]int{
-				context.Default: 0,
-				context.Recent:  0,
-				context.Search:  0,
-			},
 			YOffsets_Note: map[context.ContextPtr]int{
 				context.Default: 0,
 				context.Recent:  0,
@@ -59,19 +42,7 @@ func DefaultState() *State {
 			},
 		},
 		App: AppState{
-			LastThreadContext: context.Default,
-			LastBranchContext: context.Default,
-			LastNoteContext:   context.Default,
-			ThreadCursors: map[context.ContextPtr]uint{
-				context.Default: 0,
-				context.Recent:  0,
-				context.Search:  0,
-			},
-			BranchCursors: map[context.ContextPtr]uint{
-				context.Default: 0,
-				context.Recent:  0,
-				context.Search:  0,
-			},
+			LastNoteContext: context.Default,
 			NoteCursors: map[context.ContextPtr]uint{
 				context.Default: 0,
 				context.Recent:  0,

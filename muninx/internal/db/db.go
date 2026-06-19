@@ -41,7 +41,7 @@ func NewDB(path string, embedClient *clients.EmbedClient) (*DB, error) {
 		return nil, err
 	}
 	// Migrate schema
-	err = conn.AutoMigrate(&models.Note{}, &models.Thread{}, &models.Branch{})
+	err = conn.AutoMigrate(&models.Note{})
 	if err != nil {
 		return nil, err
 	}
@@ -67,23 +67,9 @@ func (d *DB) Close() error {
 	return sqlDB.Close()
 }
 
-// CreateThread inserts a new thread immediately and sets thread.ID from the
+// CreateNote inserts a new note immediately and sets note.ID from the
 // database-assigned autoincrement value.
-func (d *DB) CreateThread(thread *models.Thread) error {
-	return d.Conn.Omit("Branches").Create(thread).Error
-}
-
-// CreateBranch inserts a new branch immediately and sets branch.ID.
-func (d *DB) CreateBranch(branch *models.Branch) error {
-	return d.Conn.Omit("Notes").Create(branch).Error
-}
-
-// CreateNote inserts a new note immediately, sets note.ID, and writes the
-// branch_notes join-table row so the association is persisted from the start.
 func (d *DB) CreateNote(note *models.Note) error {
 	note.Content = strings.TrimSpace(note.Content)
-	if err := d.Conn.Omit("Branches").Create(note).Error; err != nil {
-		return err
-	}
-	return d.Conn.Model(note).Association("Branches").Replace(note.Branches)
+	return d.Conn.Create(note).Error
 }

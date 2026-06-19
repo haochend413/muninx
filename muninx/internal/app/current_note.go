@@ -54,9 +54,6 @@ func (a *App) GetCurrentNoteID() uint {
 	return note.ID
 }
 
-// GetCurrentNoteTopics returns a copy of the current note's topics to prevent external mutation
-// (Topics removed) GetCurrentNoteTopics no longer available.
-
 // GetCurrentNoteHighlight returns whether the current note is highlighted
 func (a *App) GetCurrentNoteHighlight() bool {
 	a.mutex.Lock()
@@ -143,7 +140,7 @@ func (a *App) HasCurrentNote() bool {
 
 // SetCurrentNoteContent updates the current note's content with edit tracking.
 // This function should automatically update diff. Maybe controlled with a signal.
-func (a *App) SetCurrentNoteContent(content string, link *models.Superlink) {
+func (a *App) SetCurrentNoteContent(content string) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -163,12 +160,12 @@ func (a *App) SetCurrentNoteContent(content string, link *models.Superlink) {
 	a.Synced = false
 
 	edit := &editstack.Edit{ID: note.ID, EditType: editstack.UpdateNote}
-	if err := a.editMgr.AddEdit(edit, link); err != nil {
+	if err := a.editMgr.AddEdit(edit); err != nil {
 		sys.LogError(err)
 	}
 }
 
-func (a *App) CommitCurrentNoteChanges(link *models.Superlink) {
+func (a *App) CommitCurrentNoteChanges() {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -182,31 +179,11 @@ func (a *App) CommitCurrentNoteChanges(link *models.Superlink) {
 		return
 	}
 
-	// dmp := diffmatchpatch.New()
-	// dmp.PatchMargin = 10
-	// // f, _ := os.Create("app.log")
-	// // fmt.Fprintln(f, "content:", content)
-	// // fmt.Fprintln(f, "note content:", note.Content)
-	// // fmt.Fprintln(f, "diff:", dmp.PatchToText(dmp.PatchMake(content, note.Content)))
-	// // fmt.Fprintln(f, "diff:", dmp.DiffMain(content, note.Content, false))
-
-	// // note.Diff = dmp.PatchToText((dmp.PatchMake(content, note.Content))) // might need to convert it to rune for chinese.
-	// note.Diff = dmp.DiffPrettyText((dmp.DiffMain(note.Content, content, false)))
-
 	dmp := diffmatchpatch.New()
 	commit := models.NoteCommit{Patch: dmp.PatchToText(dmp.PatchMake(note.CheckedContent, note.Content)), CommitTime: time.Now()}
 	note.Commits = append(note.Commits, &commit)
 	note.Diff = dmp.DiffPrettyText((dmp.DiffMain(note.CheckedContent, note.Content, false)))
 	note.CheckedContent = note.Content
-	// note.Content = content
-	// note.Frequency++
-	// note.LastEdit = time.Now()
-	// a.Synced = false
-
-	// edit := &editstack.Edit{ID: note.ID, EditType: editstack.UpdateNote}
-	// if err := a.editMgr.AddEdit(edit, link); err != nil {
-	// 	log.Printf("Error tracking note update: %v", err)
-	// }
 }
 
 // SetCurrentNoteLastEdit updates the LastEdit timestamp of the current note to the current time.
@@ -228,7 +205,7 @@ func (a *App) SetCurrentNoteLastEdit() {
 }
 
 // ToggleCurrentNoteHighlight toggles the highlight status of the current note
-func (a *App) ToggleCurrentNoteHighlight(link *models.Superlink) {
+func (a *App) ToggleCurrentNoteHighlight() {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -242,13 +219,13 @@ func (a *App) ToggleCurrentNoteHighlight(link *models.Superlink) {
 	a.Synced = false
 
 	edit := &editstack.Edit{ID: note.ID, EditType: editstack.UpdateNote}
-	if err := a.editMgr.AddEdit(edit, link); err != nil {
+	if err := a.editMgr.AddEdit(edit); err != nil {
 		sys.LogError(err)
 	}
 }
 
 // ToggleCurrentNotePrivate toggles the private status of the current note
-func (a *App) ToggleCurrentNotePrivate(link *models.Superlink) {
+func (a *App) ToggleCurrentNotePrivate() {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -262,48 +239,52 @@ func (a *App) ToggleCurrentNotePrivate(link *models.Superlink) {
 	a.Synced = false
 
 	edit := &editstack.Edit{ID: note.ID, EditType: editstack.UpdateNote}
-	if err := a.editMgr.AddEdit(edit, link); err != nil {
+	if err := a.editMgr.AddEdit(edit); err != nil {
 		sys.LogError(err)
 	}
 }
 
-// =============================================================================
-// Topic Management
-// =============================================================================
-// Topic subsystem removed: topic add/remove APIs have been removed.
-
-// DeleteCurrentNote removes the current note and tracks the deletion for sync.
-func (a *App) DeleteCurrentNote(link *models.Superlink) {
+// DeleteNoteByID marks a note as deleted without removing it from memory:
+// it's hidden from rendering immediately, but stays in the dataset (and the
+// database) so it can be restored with UndoDelete until the next sync.
+func (a *App) DeleteNoteByID(id uint) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	note := a.getCurrentNote()
-	if note == nil {
+	note := a.dataMgr.FindNoteByID(id)
+	if note == nil || note.Deleted {
 		return
 	}
-	noteID := note.ID
-	branch := a.getCurrentBranch()
 
-	if noteID != 0 {
-		deleteEdit := &editstack.Edit{ID: noteID, EditType: editstack.DeleteNote}
-		if err := a.editMgr.AddEdit(deleteEdit, link); err != nil {
-			sys.LogError(err)
-			return
-		}
+	edit := &editstack.Edit{ID: id, EditType: editstack.DeleteNote}
+	if err := a.editMgr.AddEdit(edit); err != nil {
+		sys.LogError(err)
+		return
 	}
 
-	// Mark branch for update so the branch_notes join table is cleaned up on sync.
-	if branch != nil && branch.ID != 0 {
-		updateEdit := &editstack.Edit{ID: branch.ID, EditType: editstack.UpdateBranch}
-		a.editMgr.AddEdit(updateEdit, link) //nolint:errcheck — branch might already be marked
-	}
-
-	notes := a.dataMgr.GetActiveNoteList()
-	for i, n := range notes {
-		if n.ID == noteID {
-			a.dataMgr.RemoveNote(i)
-			break
-		}
-	}
+	note.Deleted = true
+	a.deletedStack = append(a.deletedStack, id)
 	a.Synced = false
+}
+
+// UndoDelete restores the most recently deleted note, if it hasn't been
+// synced away yet, and returns it. Returns nil if there's nothing to undo.
+func (a *App) UndoDelete() *models.Note {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	if len(a.deletedStack) == 0 {
+		return nil
+	}
+	id := a.deletedStack[len(a.deletedStack)-1]
+	a.deletedStack = a.deletedStack[:len(a.deletedStack)-1]
+
+	note := a.dataMgr.FindNoteByID(id)
+	if note == nil {
+		return nil
+	}
+
+	note.Deleted = false
+	a.editMgr.RemoveEdit(editstack.EntityNote, id)
+	return note
 }

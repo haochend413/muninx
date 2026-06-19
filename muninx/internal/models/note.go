@@ -22,7 +22,6 @@ type Note struct {
 	Highlight      bool          `gorm:"default:false"`
 	Private        bool          `gorm:"default:false"`
 	Frequency      int           `gorm:"not null;default:0"`
-	Branches       []*Branch     `gorm:"many2many:branch_notes;constraint:OnDelete:CASCADE;"`
 	Commits        []*NoteCommit `gorm:"-"` // not yet persisted
-	ThreadID       uint          // Foreign key - note belongs to a single thread
+	Deleted        bool          `gorm:"-"` // pending deletion, not yet synced
 }

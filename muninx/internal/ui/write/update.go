@@ -9,7 +9,6 @@ type keyMap struct {
 	Save        key.Binding
 	Back        key.Binding
 	SyncDB      key.Binding
-	FindNote    key.Binding
 	Quit        key.Binding
 	ToggleFocus key.Binding
 }
@@ -18,7 +17,6 @@ var keys = keyMap{
 	Save:        key.NewBinding(key.WithKeys("ctrl+s")),
 	Back:        key.NewBinding(key.WithKeys("ctrl+x", "esc")),
 	SyncDB:      key.NewBinding(key.WithKeys("ctrl+q")),
-	FindNote:    key.NewBinding(key.WithKeys("ctrl+f")),
 	Quit:        key.NewBinding(key.WithKeys("ctrl+c")),
 	ToggleFocus: key.NewBinding(key.WithKeys("tab")),
 }
@@ -63,10 +61,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.SaveCurrentNote()
 			m.textArea.Blur()
 			return m, func() tea.Msg { return BackToMenuMsg{} }
-
-		case key.Matches(msg, keys.FindNote):
-			m.SaveCurrentNote()
-			return m, func() tea.Msg { return OpenFindNoteMsg{} }
 
 		case key.Matches(msg, keys.ToggleFocus):
 			if m.focus == FocusTextArea {

@@ -20,7 +20,7 @@ func (m Model) RenderContent() string {
 		Render(m.input.View())
 
 	help := styles.HelpStyle.Render(
-		"N: new note  •  Enter: open note  •  j/k ↑↓: navigate  •  Ctrl+Q: sync  •  Ctrl+C: quit",
+		"N: new note  •  Enter: open note  •  j/k ↑↓: navigate  •  Ctrl+D: delete  •  Ctrl+Z: undo  •  Ctrl+Q: sync  •  Ctrl+C: quit",
 	)
 
 	return lipgloss.JoinVertical(lipgloss.Left, header, tableBox, inputBox, help)

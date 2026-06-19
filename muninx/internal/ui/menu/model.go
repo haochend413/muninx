@@ -13,8 +13,8 @@ import (
 // Messages sent to the root model.
 type SelectNoteMsg struct{ Index int }
 type NewNoteRequestMsg struct{}
+type DeleteNoteRequestMsg struct{ Index int }
 type SyncRequestMsg struct{}
-type OpenFindNoteMsg struct{}
 type OpenQuitMsg struct{}
 
 type Model struct {

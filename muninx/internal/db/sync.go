@@ -10,21 +10,17 @@ import (
 )
 
 // SyncData persists pending updates and deletes from editMap, then reloads the
-// full thread tree from the database.  Creates are no longer tracked here;
-// they are written immediately by CreateThread/CreateBranch/CreateNote.
+// full note list from the database.  Creates are no longer tracked here; they
+// are written immediately by App.CreateNewNote.
 func (d *DB) SyncData(
-	threads []*models.Thread,
-	editMap map[editstack.EditKey]*editstack.Edit) ([]*models.Thread, error) {
+	notes []*models.Note,
+	editMap map[editstack.EditKey]*editstack.Edit) ([]*models.Note, error) {
 	if len(editMap) == 0 {
 		return d.loadAll()
 	}
 
 	notePendingIDs := make([]uint, 0)
 	noteDeleteIDs := make([]uint, 0)
-	threadPendingIDs := make([]uint, 0)
-	threadDeleteIDs := make([]uint, 0)
-	branchPendingIDs := make([]uint, 0)
-	branchDeleteIDs := make([]uint, 0)
 
 	for key, edit := range editMap {
 		id := key.ID
@@ -33,14 +29,6 @@ func (d *DB) SyncData(
 			notePendingIDs = append(notePendingIDs, id)
 		case editstack.DeleteNote:
 			noteDeleteIDs = append(noteDeleteIDs, id)
-		case editstack.UpdateThread:
-			threadPendingIDs = append(threadPendingIDs, id)
-		case editstack.DeleteThread:
-			threadDeleteIDs = append(threadDeleteIDs, id)
-		case editstack.UpdateBranch:
-			branchPendingIDs = append(branchPendingIDs, id)
-		case editstack.DeleteBranch:
-			branchDeleteIDs = append(branchDeleteIDs, id)
 		case editstack.None:
 			// skip
 		}
@@ -48,33 +36,10 @@ func (d *DB) SyncData(
 
 	notePendingIDs = uniqueIDs(notePendingIDs)
 	noteDeleteIDs = uniqueIDs(noteDeleteIDs)
-	threadPendingIDs = uniqueIDs(threadPendingIDs)
-	threadDeleteIDs = uniqueIDs(threadDeleteIDs)
-	branchPendingIDs = uniqueIDs(branchPendingIDs)
-	branchDeleteIDs = uniqueIDs(branchDeleteIDs)
 
-	// Build O(1) lookup maps from the in-memory tree.
-	threadsMap := make(map[uint]*models.Thread)
-	branchesMap := make(map[uint]*models.Branch)
-	notesMap := make(map[uint]*models.Note)
-	for _, t := range threads {
-		threadsMap[t.ID] = t
-		for _, b := range t.Branches {
-			branchesMap[b.ID] = b
-			for _, n := range b.Notes {
-				notesMap[n.ID] = n
-			}
-		}
-	}
-
-	for _, id := range threadPendingIDs {
-		if t, ok := threadsMap[id]; ok {
-			if err := d.persistThread(t); err != nil {
-				wrappedErr := fmt.Errorf("failed to update thread %d: %w", t.ID, err)
-				sys.LogError(wrappedErr)
-				return nil, wrappedErr
-			}
-		}
+	notesMap := make(map[uint]*models.Note, len(notes))
+	for _, n := range notes {
+		notesMap[n.ID] = n
 	}
 
 	for _, id := range notePendingIDs {
@@ -87,24 +52,7 @@ func (d *DB) SyncData(
 		}
 	}
 
-	for _, id := range branchPendingIDs {
-		if b, ok := branchesMap[id]; ok {
-			if err := d.persistBranch(b); err != nil {
-				wrappedErr := fmt.Errorf("failed to update branch %d: %w", b.ID, err)
-				sys.LogError(wrappedErr)
-				return nil, wrappedErr
-			}
-		}
-	}
-
-	// Delete in reverse dependency order.
 	if err := d.deleteNotes(noteDeleteIDs); err != nil {
-		return nil, err
-	}
-	if err := d.deleteBranches(branchDeleteIDs); err != nil {
-		return nil, err
-	}
-	if err := d.deleteThreads(threadDeleteIDs); err != nil {
 		return nil, err
 	}
 
@@ -117,9 +65,6 @@ func (d *DB) persistNote(note *models.Note) error {
 	}
 	note.Content = strings.TrimSpace(note.Content)
 	if err := d.Conn.Save(note).Error; err != nil {
-		return err
-	}
-	if err := d.Conn.Model(note).Association("Branches").Replace(note.Branches); err != nil {
 		return err
 	}
 	if d.EmbedClient != nil && note.Content != "" {
@@ -135,62 +80,26 @@ func (d *DB) persistNote(note *models.Note) error {
 	return nil
 }
 
-func (d *DB) persistThread(thread *models.Thread) error {
-	if thread == nil {
-		return nil
-	}
-	if err := d.Conn.Save(thread).Error; err != nil {
-		return err
-	}
-	return d.Conn.Model(thread).Association("Branches").Replace(thread.Branches)
-}
-
-func (d *DB) persistBranch(branch *models.Branch) error {
-	if branch == nil {
-		return nil
-	}
-	if err := d.Conn.Save(branch).Error; err != nil {
-		return err
-	}
-	return d.Conn.Model(branch).Association("Notes").Replace(branch.Notes)
-}
-
 func (d *DB) deleteNotes(ids []uint) error {
 	for _, id := range ids {
 		if err := d.Conn.Delete(&models.Note{}, id).Error; err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func (d *DB) deleteThreads(ids []uint) error {
-	for _, id := range ids {
-		if err := d.Conn.Delete(&models.Thread{}, id).Error; err != nil {
-			return err
+		if err := d.DeleteNoteEmbedding(id); err != nil {
+			sys.LogError(fmt.Errorf("failed to delete embedding for note %d: %v", id, err))
 		}
 	}
 	return nil
 }
 
-func (d *DB) deleteBranches(ids []uint) error {
-	for _, id := range ids {
-		if err := d.Conn.Delete(&models.Branch{}, id).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (d *DB) loadAll() ([]*models.Thread, error) {
-	var dbThreads []*models.Thread
+func (d *DB) loadAll() ([]*models.Note, error) {
+	var notes []*models.Note
 	if err := d.Conn.
-		Preload("Branches.Notes.Branches").
 		Order("created_at ASC").
-		Find(&dbThreads).Error; err != nil {
+		Find(&notes).Error; err != nil {
 		return nil, err
 	}
-	return dbThreads, nil
+	return notes, nil
 }
 
 func uniqueIDs(ids []uint) []uint {

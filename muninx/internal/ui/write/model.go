@@ -16,7 +16,6 @@ import (
 
 // Messages sent to the root model.
 type BackToMenuMsg struct{}
-type OpenFindNoteMsg struct{}
 type OpenQuitMsg struct{}
 type SyncRequestMsg struct{}
 type OpenNoteMsg struct{ Note *models.Note }
@@ -216,17 +215,8 @@ func (m *Model) SaveCurrentNote() {
 	if m.app.GetCurrentNoteID() == 0 {
 		return
 	}
-	spl := models.Superlink{
-		ThreadID: int(m.app.GetCurrentThreadID()),
-		BranchID: int(m.app.GetCurrentBranchID()),
-		NoteID:   int(m.app.GetCurrentNoteID()),
-	}
-	m.app.SetCurrentNoteContent(m.textArea.Value(), &spl)
+	m.app.SetCurrentNoteContent(m.textArea.Value())
 	m.app.SetCurrentNoteLastEdit()
-	m.app.SetCurrentThreadLastEdit()
-	m.app.IncrementCurrentThreadFrequency(nil)
-	m.app.SetCurrentBranchLastEdit()
-	m.app.IncrementCurrentBranchFrequency(nil)
 }
 
 // trimEmptyLines removes lines whose content is entirely whitespace.
