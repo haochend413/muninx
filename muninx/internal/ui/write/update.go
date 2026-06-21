@@ -22,6 +22,10 @@ var keys = keyMap{
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	// Let the status bar process its own expiry messages regardless of
+	// what else this Update call handles below.
+	m.statusbar, _ = m.statusbar.Update(msg)
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.layout = computeLayout(msg.Width, msg.Height)
@@ -55,7 +59,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		case key.Matches(msg, keys.Save):
 			m.SaveCurrentNote()
-			return m, nil
+			return m, m.ShowSavedMessage()
 
 		case key.Matches(msg, keys.Back):
 			m.SaveCurrentNote()

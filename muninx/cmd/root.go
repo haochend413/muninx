@@ -27,6 +27,41 @@ var rootCmd = &cobra.Command{
 	Long:  "muninx",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Load app config
+		fmt.Println(`                                         G  
+                                        IG  
+                                       GGGH 
+                                     IGGGGH 
+               t                   LGGFGGGX 
+          GGGGGGGGGGG            OGFGGGGGG  
+        iGF   LGGGGGGGG       0 FGGGGGGGF k 
+    NGGGGGFGFGGGGGGGGGGGF0  HGKGFFFI GGGGFG 
+  GKTXWPJGGGGGGGGGGGGGGI  GGGGGFFFn GFFGGF  
+           5GGGGGGGGGF  KFGGGFFFG 9FFFGGFS  
+             GGGGGGGF  GGFFGGFG  GFFFFFFg   
+             GGGGGGG zGGFGFGGN wFFGFFFL     
+             GGGGGFUzFGGGGFG  IGGGFI   Y    
+            GGGGGGG FGGGFFT rGGGGILGFFE     
+           lFGGGG7GGGGGFF  GGGGGGGGFFG      
+           ZGGFF FGGGGGH  FFGGGGGGFF        
+           3GFO GFGGGGP  FFFGGGGFFz         
+            GF QFGGGFQ  EGGGGFGR            
+            4  FFGFFX uGGGGGL sJF0          
+              KGFFFO  GGGGGGGGGG            
+              GGFFM  GGGGGGFFFh             
+              GGGG  GGGGGGFG                
+             OGFG  GGGGGH                   
+              GFJ GGGGd4GG                  
+              GG  GGGGGL                    
+              DG GGGG                       
+                 GI                         
+                qw                          
+               3G                           
+              GGe                           
+            eGfGG                           
+            I6 HG                           
+              Hm                            
+                                            
+                                            `)
 		cfg := config.LoadOrCreateConfig()
 		globalCfg = &cfg
 
@@ -40,7 +75,7 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, argså []string) {
 		// Get state (can be nil if first run)
 		s, err := state.LoadState(globalCfg.StateFilePath)
 		if err != nil {

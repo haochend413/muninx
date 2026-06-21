@@ -28,11 +28,15 @@ import (
 	"github.com/haochend413/lipgloss/v2"
 )
 
+// DefaultHeight is the standard single-line height views should reserve for
+// a status bar, so every view that embeds one stays visually consistent.
+const DefaultHeight = 1
+
 // Partition determines which section of the bar an element belongs to.
 type Partition int
 
 const (
-	Left   Partition = iota
+	Left Partition = iota
 	Center
 	Right
 )
@@ -41,7 +45,7 @@ const (
 type Align int
 
 const (
-	AlignLeft   Align = iota
+	AlignLeft Align = iota
 	AlignCenter
 	AlignRight
 )
@@ -59,8 +63,8 @@ type ElemConfig struct {
 // Duration == 0 means the signal persists until Clear is called.
 type Signal struct {
 	Content  string
-	Fg       string        // overrides ElemConfig.Fg when non-empty
-	Bg       string        // overrides ElemConfig.Bg when non-empty
+	Fg       string // overrides ElemConfig.Fg when non-empty
+	Bg       string // overrides ElemConfig.Bg when non-empty
 	Bold     bool
 	Duration time.Duration
 }
@@ -102,6 +106,15 @@ func (m *Model) SetWidth(w int) { m.width = w }
 
 // SetHeight resizes the bar height.
 func (m *Model) SetHeight(h int) { m.height = h }
+
+// SetElemWidth updates only the width of a named element, leaving its
+// colors and alignment untouched. Useful for an element that should track
+// the bar's full width across resizes.
+func (m *Model) SetElemWidth(tag string, width int) {
+	if e, ok := m.elems[tag]; ok {
+		e.cfg.Width = width
+	}
+}
 
 // Register adds a named slot to the given partition in declaration order.
 // Calling Register with an already-registered tag is a no-op.
@@ -191,15 +204,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 // Render returns the bar as a styled string ready to append below a view.
 func (m Model) Render() string {
-	leftStr   := m.renderPartition(m.left)
+	leftStr := m.renderPartition(m.left)
 	centerStr := m.renderPartition(m.center)
-	rightStr  := m.renderPartition(m.right)
+	rightStr := m.renderPartition(m.right)
 
 	lw := lipgloss.Width(leftStr)
 	cw := lipgloss.Width(centerStr)
 	rw := lipgloss.Width(rightStr)
 
-	fill  := max(0, m.width-lw-cw-rw)
+	fill := max(0, m.width-lw-cw-rw)
 	lfill := fill / 2
 	rfill := fill - lfill
 
@@ -226,10 +239,10 @@ func (m Model) renderElem(tag string) string {
 	if !ok {
 		return ""
 	}
-	cfg     := e.cfg
+	cfg := e.cfg
 	content := e.content
-	fg, bg  := cfg.Fg, cfg.Bg
-	bold    := false
+	fg, bg := cfg.Fg, cfg.Bg
+	bold := false
 
 	if e.signal != nil {
 		content = e.signal.Content

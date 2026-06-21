@@ -18,10 +18,6 @@ var (
 			BorderForeground(lipgloss.Color("2")).
 			Padding(0, 1)
 
-	HelpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("62")).
-			Padding(1, 0, 0, 2)
-
 	HighlightFlagStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("190"))
 	PrivateflagStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("013"))
 )

@@ -8,7 +8,6 @@ import (
 
 	"github.com/haochend413/muninx/internal/app"
 	"github.com/haochend413/muninx/internal/ui/menu"
-	"github.com/haochend413/muninx/internal/ui/quitconfirm"
 	"github.com/haochend413/muninx/internal/ui/write"
 	statePkg "github.com/haochend413/muninx/state"
 	"github.com/haochend413/muninx/sys"
@@ -23,6 +22,14 @@ var globalKeys = struct {
 }{
 	ReEmbed: key.NewBinding(key.WithKeys("ctrl+r")),
 	Undo:    key.NewBinding(key.WithKeys("ctrl+z")),
+}
+
+var quitConfirmKeys = struct {
+	Confirm key.Binding
+	Cancel  key.Binding
+}{
+	Confirm: key.NewBinding(key.WithKeys("ctrl+c")),
+	Cancel:  key.NewBinding(key.WithKeys("n", "esc")),
 }
 
 func reEmbedCmd(a *app.App) tea.Cmd {
@@ -47,6 +54,31 @@ func syncCmd(a *app.App) tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Both views' status bars must process every message regardless of
+	// which view is active: a timed Signal (e.g. the post-sync "synced"
+	// flash) fires on both bars at once, and only the active view's own
+	// Update would otherwise see the expiry message — leaving the other
+	// bar's signal stuck forever if the user switches views in between.
+	m.menu.TickStatusbar(msg)
+	m.write.TickStatusbar(msg)
+
+	// While confirming quit, every keypress is gated here: only y/n/esc do
+	// anything, and nothing reaches the active sub-model or the global keys
+	// below. Non-key messages (resize, ticks) still flow through normally.
+	if m.confirmingQuit {
+		if kMsg, ok := msg.(tea.KeyMsg); ok {
+			switch {
+			case key.Matches(kMsg, quitConfirmKeys.Confirm):
+				return m.confirmQuit()
+			case key.Matches(kMsg, quitConfirmKeys.Cancel):
+				m.cancelQuit()
+				return m, nil
+			default:
+				return m, nil
+			}
+		}
+	}
+
 	// Intercept global keys before delegating to sub-models.
 	if kMsg, ok := msg.(tea.KeyMsg); ok {
 		if key.Matches(kMsg, globalKeys.ReEmbed) {
@@ -66,11 +98,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.ready = true
-		var wc1, wc2, wc4 tea.Cmd
+		var wc1, wc2 tea.Cmd
 		m.menu, wc1 = m.menu.Update(msg)
 		m.write, wc2 = m.write.Update(msg)
-		m.quitConfirm, wc4 = m.quitConfirm.Update(msg)
-		return m, tea.Batch(wc1, wc2, wc4)
+		return m, tea.Batch(wc1, wc2)
 
 	case tickMsg:
 		return m, tick()
@@ -86,7 +117,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case syncDoneMsg:
 		m.menu.UpdateTable()
-		return m, nil
+		cmd1 := m.menu.ShowSyncedMessage()
+		cmd2 := m.write.ShowSyncedMessage()
+		return m, tea.Batch(cmd1, cmd2)
 
 	case reEmbedDoneMsg:
 		cmd := m.write.RefreshRelatedNotes()
@@ -120,8 +153,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, syncCmd(m.app)
 
 	case menu.OpenQuitMsg:
-		m.previousViewMode = m.viewMode
-		m.viewMode = QuitConfirmView
+		m.confirmingQuit = true
+		m.menu.ShowQuitPrompt()
 		return m, nil
 
 	// --- Messages from write sub-model ---
@@ -133,8 +166,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case write.OpenQuitMsg:
-		m.previousViewMode = m.viewMode
-		m.viewMode = QuitConfirmView
+		m.confirmingQuit = true
+		m.write.ShowQuitPrompt()
 		return m, nil
 
 	case write.SyncRequestMsg:
@@ -143,28 +176,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case write.OpenNoteMsg:
 		cmd := m.loadNoteIntoEditor(msg.Note)
 		return m, cmd
-
-	// --- Messages from quitconfirm sub-model ---
-
-	case quitconfirm.ConfirmMsg:
-		// Save note and collect state synchronously (fast, no I/O), then sync DB in background.
-		m.write.SaveCurrentNote()
-		s := m.CollectState()
-		a := m.app
-		cfg := m.Config
-		return m, func() tea.Msg {
-			a.SyncWithDatabase()
-			if s != nil {
-				if err := statePkg.SaveState(cfg.StateFilePath, s); err != nil {
-					sys.LogError(fmt.Errorf("error saving state: %v", err))
-				}
-			}
-			return quitSyncDoneMsg{}
-		}
-
-	case quitconfirm.CancelMsg:
-		m.viewMode = m.previousViewMode
-		return m, nil
 	}
 
 	// Delegate unhandled messages to the active sub-model.
@@ -174,10 +185,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.menu, cmd = m.menu.Update(msg)
 	case WriteView:
 		m.write, cmd = m.write.Update(msg)
-	case QuitConfirmView:
-		m.quitConfirm, cmd = m.quitConfirm.Update(msg)
 	}
 	return m, cmd
+}
+
+// confirmQuit saves the current note and state synchronously, then runs the
+// database sync in the background before quitting.
+func (m Model) confirmQuit() (tea.Model, tea.Cmd) {
+	m.write.SaveCurrentNote()
+	s := m.CollectState()
+	a := m.app
+	cfg := m.Config
+	return m, func() tea.Msg {
+		a.SyncWithDatabase()
+		if s != nil {
+			if err := statePkg.SaveState(cfg.StateFilePath, s); err != nil {
+				sys.LogError(fmt.Errorf("error saving state: %v", err))
+			}
+		}
+		return quitSyncDoneMsg{}
+	}
+}
+
+// cancelQuit clears the quit prompt from whichever view's status bar is
+// currently showing it.
+func (m *Model) cancelQuit() {
+	m.confirmingQuit = false
+	switch m.viewMode {
+	case WriteView:
+		m.write.ClearQuitPrompt()
+	default:
+		m.menu.ClearQuitPrompt()
+	}
 }
 
 func switchToEnglish() {

@@ -18,8 +18,6 @@ func (m Model) View() tea.View {
 		content = m.menu.RenderContent()
 	case WriteView:
 		content = m.write.RenderContent()
-	case QuitConfirmView:
-		content = m.quitConfirm.RenderContent()
 	default:
 		content = m.menu.RenderContent()
 	}

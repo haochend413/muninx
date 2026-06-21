@@ -16,10 +16,12 @@ type HeaderOpts struct {
 }
 
 func renderHeader(base lipgloss.Style, o HeaderOpts) string {
-	text := RenderMuninx()
+	text := RenderMuninx(o.Width)
 
 	style := base.Foreground(o.MainTextColor).Border(lipgloss.BlockBorder(), false, false, false, false)
 
+	// Stretching covers most widths; truncate only as a last resort, e.g. on
+	// a terminal too narrow even for the unstretched wordmark.
 	if o.Width > 0 {
 		lines := strings.Split(text, "\n")
 		for i, line := range lines {

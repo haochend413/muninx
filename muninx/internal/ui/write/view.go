@@ -18,5 +18,6 @@ func (m Model) RenderContent() string {
 		Width(m.layout.RelatedWidth).
 		Render(vpView)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+	content := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+	return lipgloss.JoinVertical(lipgloss.Left, content, m.statusbar.Render())
 }

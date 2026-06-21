@@ -11,6 +11,7 @@ import (
 	"github.com/haochend413/lipgloss/v2"
 	"github.com/haochend413/muninx/internal/app"
 	"github.com/haochend413/muninx/internal/models"
+	"github.com/haochend413/muninx/internal/ui/statusbar"
 	"github.com/haochend413/muninx/internal/ui/viewport"
 )
 
@@ -26,6 +27,10 @@ type OpenNoteMsg struct{ Note *models.Note }
 type TickMsg struct{ Gen int }
 
 const tickInterval = 80 * time.Millisecond
+
+// statusbarMainTag is the single full-width status bar element. It shows
+// whatever is currently relevant — for now, just the quit confirmation.
+const statusbarMainTag = "main"
 
 func doTick(gen int) tea.Cmd {
 	return tea.Tick(tickInterval, func(t time.Time) tea.Msg {
@@ -60,6 +65,7 @@ type Model struct {
 	app       *app.App
 	textArea  textarea_vim.Model
 	relatedVp viewport.Model
+	statusbar statusbar.Model
 	focus     Focus
 	layout    Layout
 
@@ -89,22 +95,58 @@ func New(application *app.App) Model {
 	vp := viewport.New()
 	vp.SoftWrap = true
 
+	bar := statusbar.New(0, statusbar.DefaultHeight)
+	bar.Register(statusbarMainTag, statusbar.Left, statusbar.ElemConfig{Align: statusbar.AlignLeft})
+
 	return Model{
 		app:       application,
 		textArea:  ta,
 		relatedVp: vp,
+		statusbar: bar,
 		focus:     FocusTextArea,
 	}
 }
 
 func (m Model) Init() tea.Cmd { return nil }
 
-// applyLayout pushes layout dimensions into both panels.
+// TickStatusbar lets the status bar process its own expiry/resize messages
+// even while this view isn't the active one — a timed Signal (e.g. the
+// "synced" flash) must still clear on schedule no matter which view the
+// user switches to in the meantime.
+func (m *Model) TickStatusbar(msg tea.Msg) {
+	m.statusbar, _ = m.statusbar.Update(msg)
+}
+
+// applyLayout pushes layout dimensions into both panels and the status bar.
 func (m *Model) applyLayout() {
 	m.textArea.SetWidth(m.layout.TextAreaWidth)
-	m.textArea.SetHeight(m.layout.WindowHeight)
+	m.textArea.SetHeight(m.layout.ContentHeight)
 	m.relatedVp.SetWidth(m.layout.RelatedWidth)
-	m.relatedVp.SetHeight(m.layout.WindowHeight)
+	m.relatedVp.SetHeight(m.layout.ContentHeight)
+	m.statusbar.SetWidth(m.layout.WindowWidth)
+	m.statusbar.SetElemWidth(statusbarMainTag, m.layout.WindowWidth)
+}
+
+// ShowQuitPrompt displays the quit confirmation prompt on the status bar.
+func (m *Model) ShowQuitPrompt() {
+	m.statusbar.Signal(statusbarMainTag, statusbar.QuitPrompt())
+}
+
+// ClearQuitPrompt removes the quit confirmation prompt from the status bar.
+func (m *Model) ClearQuitPrompt() {
+	m.statusbar.Clear(statusbarMainTag)
+}
+
+// ShowSyncedMessage flashes a brief confirmation that pending changes were
+// pushed to the database.
+func (m *Model) ShowSyncedMessage() tea.Cmd {
+	return m.statusbar.Signal(statusbarMainTag, statusbar.Synced())
+}
+
+// ShowSavedMessage flashes a brief confirmation that the note's modified
+// content was saved.
+func (m *Model) ShowSavedMessage() tea.Cmd {
+	return m.statusbar.Signal(statusbarMainTag, statusbar.Saved())
 }
 
 // renderLines renders each line of s with style independently, preventing

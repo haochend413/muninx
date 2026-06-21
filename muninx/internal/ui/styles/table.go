@@ -11,7 +11,7 @@ import (
 	"github.com/haochend413/lipgloss/v2"
 	// "github.com/haochend413/lipgloss"
 	// "github.com/charmbracelet/lipgloss"
-	"github.com/haochend413/bubbles/v2/table"
+	"github.com/haochend413/muninx/internal/ui/table"
 )
 
 var BaseTableStyle = table.Styles{
@@ -35,8 +35,8 @@ var FocusedTableStyle = table.Styles{
 	Cell: lipgloss.NewStyle().
 		Padding(0, 0),
 	Selected: lipgloss.NewStyle().
-		Foreground(lipgloss.Color("226")).
-		Background(lipgloss.Color("20")). // purple
+		Foreground(lipgloss.Color("51")).
+		// Background(lipgloss.Color("20")). // purple
 		Bold(true),
 }
 

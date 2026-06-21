@@ -10,7 +10,6 @@ import (
 	"github.com/haochend413/muninx/internal/app"
 	"github.com/haochend413/muninx/internal/models"
 	"github.com/haochend413/muninx/internal/ui/menu"
-	"github.com/haochend413/muninx/internal/ui/quitconfirm"
 	"github.com/haochend413/muninx/internal/ui/write"
 	"github.com/haochend413/muninx/state"
 )
@@ -19,9 +18,8 @@ import (
 type ViewMode int
 
 const (
-	MenuView        ViewMode = iota
+	MenuView ViewMode = iota
 	WriteView
-	QuitConfirmView
 )
 
 // ApplicationView is kept as an alias so any remaining old references compile.
@@ -34,16 +32,18 @@ type Model struct {
 	app    *app.App
 	Config *config.Config
 
-	viewMode         ViewMode
-	previousViewMode ViewMode
+	viewMode ViewMode
+
+	// confirmingQuit gates all keypresses except y/n/esc to the quit prompt
+	// shown on the active view's own status bar — there's no separate view.
+	confirmingQuit bool
 
 	// Hidden table used only for DistributeState / CollectState.
 	notesTable bTable.Model
 
 	// Sub-models, one per view.
-	menu        menu.Model
-	write       write.Model
-	quitConfirm quitconfirm.Model
+	menu  menu.Model
+	write write.Model
 
 	width  int
 	height int
@@ -73,13 +73,12 @@ func NewModel(application *app.App, cfg *config.Config, s *state.State) Model {
 	)
 
 	m := Model{
-		app:         application,
-		Config:      cfg,
-		viewMode:    MenuView,
-		notesTable:  noteTable,
-		menu:        menu.New(application),
-		write:       write.New(application),
-		quitConfirm: quitconfirm.New(),
+		app:        application,
+		Config:     cfg,
+		viewMode:   MenuView,
+		notesTable: noteTable,
+		menu:       menu.New(application),
+		write:      write.New(application),
 	}
 
 	// Populate hidden state table and restore cursor position.

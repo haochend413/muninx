@@ -3,9 +3,10 @@ package menu
 const (
 	tableIDWidth   = 6
 	tableTimeWidth = 16
-	tablePad       = 8 // internal table column padding (bubbles table overhead)
-	// header(3) + tableBox border(2) + inputBox(3) + help(2) = 10
-	verticalOverhead = 10
+	tableColumnGap = 2 // blank spacer column rendered between Content and Last Edited
+	// header(4) + inputBox(3) + statusbar(1) = 8
+	// (tableBox renders with all border sides disabled, so it adds 0.)
+	verticalOverhead = 8
 )
 
 // Layout holds all computed dimensions for MenuView.
@@ -15,9 +16,10 @@ type Layout struct {
 
 	TableIDWidth      int
 	TableContentWidth int
+	TableColumnGap    int
 	TableTimeWidth    int
 	TableHeight       int
-	TableWidth        int // inner table width (= WindowWidth - FocusedStyle frame 4)
+	TableWidth        int // inner table width (= WindowWidth - FocusedStyle frame 2)
 
 	InputWidth int // outer width of the input box
 }
@@ -30,9 +32,10 @@ func computeLayout(width, height int) Layout {
 		height = 1
 	}
 
-	// tableW is the table's own rendered width (FocusedStyle adds 4 around it).
-	tableW := width - 4
-	contentW := tableW - tableIDWidth - tableTimeWidth - tablePad
+	// tableW is the table's own rendered width. FocusedStyle renders with no
+	// border (disabled in view.go) and Padding(0, 1), so it adds 2 (1 each side).
+	tableW := width - 2
+	contentW := tableW - tableIDWidth - tableTimeWidth - tableColumnGap
 	if contentW < 10 {
 		contentW = 10
 	}
@@ -47,6 +50,7 @@ func computeLayout(width, height int) Layout {
 		WindowHeight:      height,
 		TableIDWidth:      tableIDWidth,
 		TableContentWidth: contentW,
+		TableColumnGap:    tableColumnGap,
 		TableTimeWidth:    tableTimeWidth,
 		TableHeight:       tableH,
 		TableWidth:        tableW,
