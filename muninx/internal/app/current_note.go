@@ -164,24 +164,6 @@ func (a *App) SetCurrentNoteContent(content string) {
 	}
 }
 
-// SetCurrentNoteLastEdit updates the LastEdit timestamp of the current note to the current time.
-// Ensures the timestamp is not set to a past time.
-func (a *App) SetCurrentNoteLastEdit() {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-
-	note := a.getCurrentNote()
-	if note == nil {
-		return
-	}
-
-	// dont set it backwards
-	if time.Now().Before(note.LastEdit) {
-		return
-	}
-	note.LastEdit = time.Now()
-}
-
 // ToggleCurrentNoteHighlight toggles the highlight status of the current note
 func (a *App) ToggleCurrentNoteHighlight() {
 	a.mutex.Lock()

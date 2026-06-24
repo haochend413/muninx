@@ -86,6 +86,15 @@ type Model struct {
 	relatedText   string             // plain concatenated text, used to count revealedChars
 	revealedChars int
 	tickGen       int
+
+	// loadedNoteID is the note actually opened into the textarea via
+	// LoadNote, or 0 if none has been opened yet this session. The app
+	// always has *some* active note by default (the first one loaded from
+	// the DB), even before the user opens anything in the write view - so
+	// SaveCurrentNote must gate on this instead of on app.GetCurrentNoteID,
+	// or it would overwrite that default-active note's content with the
+	// textarea's empty starting value on a quit-without-opening-anything.
+	loadedNoteID uint
 }
 
 func New(application *app.App) Model {
@@ -340,6 +349,7 @@ func (m *Model) LoadNote(note *models.Note) tea.Cmd {
 	if note == nil {
 		return nil
 	}
+	m.loadedNoteID = note.ID
 	m.textArea.SetValue(note.Content)
 	focusCmd := m.textArea.Focus()
 	m.focus = FocusTextArea
@@ -354,11 +364,10 @@ func (m *Model) LoadNote(note *models.Note) tea.Cmd {
 
 // SaveCurrentNote persists the textarea content to the active note.
 func (m *Model) SaveCurrentNote() {
-	if m.app.GetCurrentNoteID() == 0 {
+	if m.loadedNoteID == 0 || m.app.GetCurrentNoteID() != m.loadedNoteID {
 		return
 	}
 	m.app.SetCurrentNoteContent(m.textArea.Value())
-	m.app.SetCurrentNoteLastEdit()
 }
 
 // trimEmptyLines removes lines whose content is entirely whitespace.
