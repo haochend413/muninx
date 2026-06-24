@@ -1,28 +1,30 @@
 package menu
 
 import (
-	"github.com/haochend413/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/haochend413/bubbles/v2/key"
 )
 
 type keyMap struct {
-	NewNote    key.Binding
-	Select     key.Binding
-	SyncDB     key.Binding
-	DeleteNote key.Binding
-	Quit       key.Binding
-	NavUp      key.Binding
-	NavDown    key.Binding
+	NewNote      key.Binding
+	Select       key.Binding
+	SyncDB       key.Binding
+	DeleteNote   key.Binding
+	Quit         key.Binding
+	NavUp        key.Binding
+	NavDown      key.Binding
+	ToggleRecent key.Binding
 }
 
 var keys = keyMap{
-	NewNote:    key.NewBinding(key.WithKeys("N")),
-	Select:     key.NewBinding(key.WithKeys("enter")),
-	SyncDB:     key.NewBinding(key.WithKeys("ctrl+q")),
-	DeleteNote: key.NewBinding(key.WithKeys("ctrl+d")),
-	Quit:       key.NewBinding(key.WithKeys("ctrl+c")),
-	NavUp:      key.NewBinding(key.WithKeys("up")),
-	NavDown:    key.NewBinding(key.WithKeys("down")),
+	NewNote:      key.NewBinding(key.WithKeys("N")),
+	Select:       key.NewBinding(key.WithKeys("enter")),
+	SyncDB:       key.NewBinding(key.WithKeys("ctrl+q")),
+	DeleteNote:   key.NewBinding(key.WithKeys("ctrl+d")),
+	Quit:         key.NewBinding(key.WithKeys("ctrl+c")),
+	NavUp:        key.NewBinding(key.WithKeys("up")),
+	NavDown:      key.NewBinding(key.WithKeys("down")),
+	ToggleRecent: key.NewBinding(key.WithKeys("ctrl+r")),
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -46,11 +48,22 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		case key.Matches(msg, keys.SyncDB):
 			return m, func() tea.Msg { return SyncRequestMsg{} }
 		case key.Matches(msg, keys.DeleteNote):
-			return m, func() tea.Msg { return DeleteNoteRequestMsg{Index: m.table.Cursor()} }
+			if id, ok := m.SelectedNoteID(); ok {
+				return m, func() tea.Msg { return DeleteNoteRequestMsg{NoteID: id} }
+			}
+			return m, nil
 		case key.Matches(msg, keys.NewNote):
 			return m, func() tea.Msg { return NewNoteRequestMsg{} }
+		case key.Matches(msg, keys.ToggleRecent):
+			m.ToggleRecentOnly()
+			m.UpdateTable()
+			m.table.SetCursor(0)
+			return m, nil
 		case key.Matches(msg, keys.Select):
-			return m, func() tea.Msg { return SelectNoteMsg{Index: m.table.Cursor()} }
+			if id, ok := m.SelectedNoteID(); ok {
+				return m, func() tea.Msg { return SelectNoteMsg{NoteID: id} }
+			}
+			return m, nil
 		case key.Matches(msg, keys.NavUp), key.Matches(msg, keys.NavDown):
 			// Arrow keys browse the (possibly filtered) table; every other
 			// key belongs to the input bar below.

@@ -6,19 +6,29 @@ import (
 )
 
 type keyMap struct {
-	Save        key.Binding
-	Back        key.Binding
-	SyncDB      key.Binding
-	Quit        key.Binding
-	ToggleFocus key.Binding
+	Save                key.Binding
+	Back                key.Binding
+	SyncDB              key.Binding
+	Quit                key.Binding
+	ToggleFocus         key.Binding
+	PushCommit          key.Binding
+	OmitCommit          key.Binding
+	ToggleCommitHistory key.Binding
+	CommitHistoryLeft   key.Binding
+	CommitHistoryRight  key.Binding
 }
 
 var keys = keyMap{
-	Save:        key.NewBinding(key.WithKeys("ctrl+s")),
-	Back:        key.NewBinding(key.WithKeys("ctrl+x", "esc")),
-	SyncDB:      key.NewBinding(key.WithKeys("ctrl+q")),
-	Quit:        key.NewBinding(key.WithKeys("ctrl+c")),
-	ToggleFocus: key.NewBinding(key.WithKeys("tab")),
+	Save:                key.NewBinding(key.WithKeys("ctrl+s")),
+	Back:                key.NewBinding(key.WithKeys("ctrl+x", "esc")),
+	SyncDB:              key.NewBinding(key.WithKeys("ctrl+q")),
+	Quit:                key.NewBinding(key.WithKeys("ctrl+c")),
+	ToggleFocus:         key.NewBinding(key.WithKeys("tab")),
+	PushCommit:          key.NewBinding(key.WithKeys("ctrl+p")),
+	OmitCommit:          key.NewBinding(key.WithKeys("ctrl+o")),
+	ToggleCommitHistory: key.NewBinding(key.WithKeys("h")),
+	CommitHistoryLeft:   key.NewBinding(key.WithKeys("left")),
+	CommitHistoryRight:  key.NewBinding(key.WithKeys("right")),
 }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -39,10 +49,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		runes := []rune(m.relatedText)
 		if m.revealedChars < len(runes) {
 			m.revealedChars++
-			m.updateRelatedViewport()
-			// Auto-scroll to bottom while animating, unless user is browsing.
-			if m.focus != FocusRelated {
-				m.relatedVp.GotoBottom()
+			// Keep advancing in the background, but don't clobber the
+			// commit diff if that's what's currently displayed.
+			if m.rightPanelMode == RelatedNotesMode {
+				m.updateRelatedViewport()
+				// Auto-scroll to bottom while animating, unless user is browsing.
+				if m.focus != FocusRelated {
+					m.relatedVp.GotoBottom()
+				}
 			}
 			return m, doTick(m.tickGen)
 		}
@@ -66,16 +80,35 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.textArea.Blur()
 			return m, func() tea.Msg { return BackToMenuMsg{} }
 
+		case key.Matches(msg, keys.PushCommit):
+			m.SaveCurrentNote()
+			return m, m.CommitNote()
+
+		case key.Matches(msg, keys.OmitCommit):
+			return m, m.OmitCommit()
+
+		case key.Matches(msg, keys.ToggleCommitHistory) && m.focus == FocusRelated:
+			m.ToggleCommitHistoryView()
+			return m, nil
+
+		case key.Matches(msg, keys.CommitHistoryLeft) && m.rightPanelMode == CommitHistoryMode && m.focus == FocusRelated:
+			m.CommitHistoryLeft()
+			return m, nil
+
+		case key.Matches(msg, keys.CommitHistoryRight) && m.rightPanelMode == CommitHistoryMode && m.focus == FocusRelated:
+			m.CommitHistoryRight()
+			return m, nil
+
 		case key.Matches(msg, keys.ToggleFocus):
 			if m.focus == FocusTextArea {
 				m.focus = FocusRelated
 				m.textArea.Blur()
 			} else {
 				m.focus = FocusTextArea
-				m.updateRelatedViewport() // refresh to dim colors
+				m.refreshRightPanel() // refresh to dim colors
 				return m, m.textArea.Focus()
 			}
-			m.updateRelatedViewport() // refresh to active colors
+			m.refreshRightPanel() // refresh to active colors
 			return m, nil
 		}
 	}

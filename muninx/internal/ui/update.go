@@ -20,7 +20,7 @@ var globalKeys = struct {
 	ReEmbed key.Binding
 	Undo    key.Binding
 }{
-	ReEmbed: key.NewBinding(key.WithKeys("ctrl+r")),
+	ReEmbed: key.NewBinding(key.WithKeys("ctrl+e")),
 	Undo:    key.NewBinding(key.WithKeys("ctrl+z")),
 }
 
@@ -131,9 +131,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// --- Messages from menu sub-model ---
 
 	case menu.SelectNoteMsg:
-		notes := m.app.GetDataMgr().GetAllNotesByIDDesc()
-		if msg.Index >= 0 && msg.Index < len(notes) {
-			cmd := m.loadNoteIntoEditor(notes[msg.Index])
+		if n := m.app.GetDataMgr().FindNoteByID(msg.NoteID); n != nil {
+			cmd := m.loadNoteIntoEditor(n)
 			return m, cmd
 		}
 		return m, nil
@@ -142,11 +141,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleNewNote()
 
 	case menu.DeleteNoteRequestMsg:
-		notes := m.app.GetDataMgr().GetAllNotesByIDDesc()
-		if msg.Index >= 0 && msg.Index < len(notes) {
-			m.app.DeleteNoteByID(notes[msg.Index].ID)
-			m.menu.UpdateTable()
-		}
+		m.app.DeleteNoteByID(msg.NoteID)
+		m.menu.UpdateTable()
 		return m, nil
 
 	case menu.SyncRequestMsg:

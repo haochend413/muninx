@@ -6,10 +6,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// we will get to save commits for the note.
+// NoteCommit is a persisted snapshot of a note's content, recorded as a
+// patch from the previous snapshot (or from empty, for the first commit).
 type NoteCommit struct {
+	gorm.Model
+	NoteID     uint   // Foreign key - commit belongs to a single note
 	Patch      string // raw patch, unparsed.
 	CommitTime time.Time
+	Archived   bool `gorm:"default:false"`
 }
 
 // Note represents a note entity
@@ -22,6 +26,7 @@ type Note struct {
 	Highlight      bool          `gorm:"default:false"`
 	Private        bool          `gorm:"default:false"`
 	Frequency      int           `gorm:"not null;default:0"`
-	Commits        []*NoteCommit `gorm:"-"` // not yet persisted
+	Commits        []*NoteCommit `gorm:"constraint:OnDelete:CASCADE;"`
 	Deleted        bool          `gorm:"-"` // pending deletion, not yet synced
+	Archived       bool
 }

@@ -7,6 +7,7 @@ import (
 	editstack "github.com/haochend413/muninx/internal/app/editStack"
 	"github.com/haochend413/muninx/internal/models"
 	"github.com/haochend413/muninx/sys"
+	"gorm.io/gorm"
 )
 
 // SyncData persists pending updates and deletes from editMap, then reloads the
@@ -85,6 +86,12 @@ func (d *DB) deleteNotes(ids []uint) error {
 		if err := d.Conn.Delete(&models.Note{}, id).Error; err != nil {
 			return err
 		}
+		// Explicit cleanup: this driver's DSN doesn't enable SQLite's
+		// foreign_keys pragma, so the gorm "OnDelete:CASCADE" constraint on
+		// Note.Commits is declared in the schema but not enforced by SQLite.
+		if err := d.Conn.Where("note_id = ?", id).Delete(&models.NoteCommit{}).Error; err != nil {
+			sys.LogError(fmt.Errorf("failed to delete commits for note %d: %v", id, err))
+		}
 		if err := d.DeleteNoteEmbedding(id); err != nil {
 			sys.LogError(fmt.Errorf("failed to delete embedding for note %d: %v", id, err))
 		}
@@ -95,6 +102,9 @@ func (d *DB) deleteNotes(ids []uint) error {
 func (d *DB) loadAll() ([]*models.Note, error) {
 	var notes []*models.Note
 	if err := d.Conn.
+		Preload("Commits", func(db *gorm.DB) *gorm.DB {
+			return db.Order("note_commits.id ASC")
+		}).
 		Order("created_at ASC").
 		Find(&notes).Error; err != nil {
 		return nil, err

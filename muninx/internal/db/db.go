@@ -41,7 +41,7 @@ func NewDB(path string, embedClient *clients.EmbedClient) (*DB, error) {
 		return nil, err
 	}
 	// Migrate schema
-	err = conn.AutoMigrate(&models.Note{})
+	err = conn.AutoMigrate(&models.Note{}, &models.NoteCommit{})
 	if err != nil {
 		return nil, err
 	}

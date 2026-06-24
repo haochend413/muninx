@@ -37,3 +37,23 @@ func Saved() Signal {
 		Duration: flashDuration,
 	}
 }
+
+// Committed returns a brief confirmation that a commit was pushed.
+func Committed() Signal {
+	return Signal{
+		Content:  "Commit pushed.",
+		Fg:       "51", // bright green
+		Bold:     true,
+		Duration: flashDuration,
+	}
+}
+
+// CommitOmitted returns a brief confirmation that the last commit was undone.
+func CommitOmitted() Signal {
+	return Signal{
+		Content:  "Last commit omitted.",
+		Fg:       "51", // bright green
+		Bold:     true,
+		Duration: flashDuration,
+	}
+}

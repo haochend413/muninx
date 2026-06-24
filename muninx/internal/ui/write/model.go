@@ -46,6 +46,16 @@ const (
 	FocusRelated
 )
 
+// RightPanelMode controls what the right-hand panel shows while it has
+// focus: related notes (the default), or commit history — a diff for some
+// position in the note's commit stack, navigable with left/right arrows.
+type RightPanelMode int
+
+const (
+	RelatedNotesMode RightPanelMode = iota
+	CommitHistoryMode
+)
+
 // relatedNoteEntry holds the data needed to render one related note.
 type relatedNoteEntry struct {
 	content   string
@@ -62,12 +72,14 @@ var (
 )
 
 type Model struct {
-	app       *app.App
-	textArea  textarea_vim.Model
-	relatedVp viewport.Model
-	statusbar statusbar.Model
-	focus     Focus
-	layout    Layout
+	app            *app.App
+	textArea       textarea_vim.Model
+	relatedVp      viewport.Model
+	statusbar      statusbar.Model
+	focus          Focus
+	rightPanelMode RightPanelMode
+	commitIndex    int // position in commit history mode; len(commits) means "next commit preview"
+	layout         Layout
 
 	// Typewriter state
 	relatedNotes  []relatedNoteEntry // metadata for each note (content + time)
@@ -81,7 +93,13 @@ func New(application *app.App) Model {
 	taStyles := ta.Styles()
 	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
 	taStyles.Focused.CursorLine = cursorStyle
-	taStyles.Blurred.CursorLine = cursorStyle
+	// Match the related panel's dim/lit colors, so whichever side has focus
+	// is obviously the brighter one. The cursor's line is styled separately
+	// from the rest of the text, so it needs the same dim treatment while
+	// blurred — otherwise it stays bright regardless of focus.
+	taStyles.Blurred.CursorLine = noteTextDimStyle
+	taStyles.Focused.Text = noteTextLitStyle
+	taStyles.Blurred.Text = noteTextDimStyle
 	ta.SetStyles(taStyles)
 	ta.Placeholder = "Start writing..."
 	ta.ShowLineNumbers = false
@@ -222,6 +240,86 @@ func (m *Model) updateRelatedViewport() {
 	m.relatedVp.SetContent(m.buildStyledContent())
 }
 
+// refreshRightPanel re-renders the right panel for whichever mode is
+// currently active.
+func (m *Model) refreshRightPanel() {
+	switch m.rightPanelMode {
+	case CommitHistoryMode:
+		if m.commitIndex >= m.app.GetCommitCount() {
+			m.relatedVp.SetContent(m.app.GetNextCommitPreview())
+		} else {
+			m.relatedVp.SetContent(m.app.GetCommitDiffAt(m.commitIndex))
+		}
+	default:
+		m.updateRelatedViewport()
+	}
+}
+
+// ToggleCommitHistoryView switches the right panel between related notes
+// and commit history. Entering commit history starts at the preview of
+// the next commit (saving the textarea's current value first, so the
+// preview reflects what's actually been typed rather than a stale Content
+// field); left/right arrows then step backward/forward through the note's
+// commit stack.
+func (m *Model) ToggleCommitHistoryView() {
+	if m.rightPanelMode == CommitHistoryMode {
+		m.rightPanelMode = RelatedNotesMode
+	} else {
+		m.SaveCurrentNote()
+		m.commitIndex = m.app.GetCommitCount()
+		m.rightPanelMode = CommitHistoryMode
+	}
+	m.refreshRightPanel()
+}
+
+// CommitHistoryLeft steps to the previous (older) position in the commit
+// stack, if any.
+func (m *Model) CommitHistoryLeft() {
+	if m.commitIndex > 0 {
+		m.commitIndex--
+		m.refreshRightPanel()
+	}
+}
+
+// CommitHistoryRight steps to the next (newer) position in the commit
+// stack, up to the next-commit preview, if any.
+func (m *Model) CommitHistoryRight() {
+	if m.commitIndex < m.app.GetCommitCount() {
+		m.commitIndex++
+		m.refreshRightPanel()
+	}
+}
+
+// CommitNote pushes a commit for the active note, flashes a confirmation,
+// and keeps the right panel in sync if it's currently showing a commit
+// diff or preview. No flash if there was nothing to commit.
+func (m *Model) CommitNote() tea.Cmd {
+	if !m.app.CommitNote() {
+		return nil
+	}
+	if m.rightPanelMode == CommitHistoryMode {
+		m.commitIndex = m.app.GetCommitCount()
+		m.refreshRightPanel()
+	}
+	return m.statusbar.Signal(statusbarMainTag, statusbar.Committed())
+}
+
+// OmitCommit undoes the active note's most recent commit, flashes a
+// confirmation, and keeps the right panel in sync if it's currently
+// showing a commit diff or preview. No flash if there was nothing to omit.
+func (m *Model) OmitCommit() tea.Cmd {
+	if !m.app.OmitCommit() {
+		return nil
+	}
+	if m.rightPanelMode == CommitHistoryMode {
+		if count := m.app.GetCommitCount(); m.commitIndex > count {
+			m.commitIndex = count
+		}
+		m.refreshRightPanel()
+	}
+	return m.statusbar.Signal(statusbarMainTag, statusbar.CommitOmitted())
+}
+
 // RefreshRelatedNotes re-fetches related notes for the currently open note and
 // restarts the typewriter animation. Call this after a re-embed completes so
 // the related panel reflects the updated embeddings.
@@ -245,6 +343,8 @@ func (m *Model) LoadNote(note *models.Note) tea.Cmd {
 	m.textArea.SetValue(note.Content)
 	focusCmd := m.textArea.Focus()
 	m.focus = FocusTextArea
+	m.rightPanelMode = RelatedNotesMode
+	m.commitIndex = 0
 	m.loadRelatedNotes(note.ID)
 	if m.relatedText != "" {
 		return tea.Batch(focusCmd, doTick(m.tickGen))

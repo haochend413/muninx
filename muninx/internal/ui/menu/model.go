@@ -3,6 +3,7 @@ package menu
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/haochend413/muninx/internal/app"
@@ -12,10 +13,13 @@ import (
 	bTable "github.com/haochend413/muninx/internal/ui/table"
 )
 
+// recentWindow is how far back "recent" notes mode looks.
+const recentWindow = 7 * 24 * time.Hour
+
 // Messages sent to the root model.
-type SelectNoteMsg struct{ Index int }
+type SelectNoteMsg struct{ NoteID uint }
 type NewNoteRequestMsg struct{}
-type DeleteNoteRequestMsg struct{ Index int }
+type DeleteNoteRequestMsg struct{ NoteID uint }
 type SyncRequestMsg struct{}
 type OpenQuitMsg struct{}
 
@@ -33,12 +37,32 @@ const (
 )
 
 type Model struct {
-	app       *app.App
-	table     bTable.Model
-	input     menuinput.Model
-	statusbar statusbar.Model
-	layout    Layout
-	mode      InputMode
+	app        *app.App
+	table      bTable.Model
+	input      menuinput.Model
+	statusbar  statusbar.Model
+	layout     Layout
+	mode       InputMode
+	recentOnly bool // when true and search is empty, show only notes edited within recentWindow
+
+	// rowNoteIDs maps each currently visible table row to its note ID, in
+	// the same order as the table's rows. The table cursor is a position in
+	// this (possibly filtered) list, so any action keyed off the cursor must
+	// resolve through rowNoteIDs rather than re-deriving an unfiltered list -
+	// otherwise the cursor position silently points at the wrong note
+	// whenever a filter (search or recent-only) is active.
+	rowNoteIDs []uint
+}
+
+// SelectedNoteID returns the note ID for the row currently under the table
+// cursor, accounting for whatever filter (search/recent-only) is active. ok
+// is false if the table has no rows (e.g. empty filter results).
+func (m Model) SelectedNoteID() (id uint, ok bool) {
+	c := m.table.Cursor()
+	if c < 0 || c >= len(m.rowNoteIDs) {
+		return 0, false
+	}
+	return m.rowNoteIDs[c], true
 }
 
 func New(application *app.App) Model {
@@ -96,6 +120,12 @@ func (m *Model) ShowSyncedMessage() tea.Cmd {
 	return m.statusbar.Signal(statusbarMainTag, statusbar.Synced())
 }
 
+// ToggleRecentOnly flips whether the table, when search is empty, shows
+// only notes edited within the last 7 days or all notes.
+func (m *Model) ToggleRecentOnly() {
+	m.recentOnly = !m.recentOnly
+}
+
 // UpdateTable refreshes table rows and column widths using the current
 // layout. In SearchMode, the input's value filters notes down to those
 // containing it, and the Content column shows a snippet around the match
@@ -114,10 +144,17 @@ func (m *Model) UpdateTable() {
 		query = strings.TrimSpace(m.input.Value())
 	}
 
+	cutoff := time.Now().Add(-recentWindow)
+
 	notes := m.app.GetDataMgr().GetAllNotesByIDDesc()
 	rows := make([]bTable.Row, 0, len(notes))
+	rowNoteIDs := make([]uint, 0, len(notes))
 	for _, n := range notes {
-		if query != "" && !matchesQuery(n, query) {
+		if query != "" {
+			if !matchesQuery(n, query) {
+				continue
+			}
+		} else if m.recentOnly && n.LastEdit.Before(cutoff) {
 			continue
 		}
 
@@ -132,8 +169,10 @@ func (m *Model) UpdateTable() {
 			"",
 			formatTimeAgo(n.LastEdit),
 		})
+		rowNoteIDs = append(rowNoteIDs, n.ID)
 	}
 
+	m.rowNoteIDs = rowNoteIDs
 	m.table.SetColumns(cols)
 	m.table.SetRows(rows)
 	m.table.SetWidth(l.TableWidth)

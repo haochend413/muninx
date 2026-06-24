@@ -9,6 +9,7 @@ func (m Model) View() tea.View {
 	if !m.ready {
 		v := tea.NewView("Initializing...")
 		v.AltScreen = true
+		v.MouseMode = tea.MouseModeCellMotion
 		return v
 	}
 
@@ -24,5 +25,8 @@ func (m Model) View() tea.View {
 
 	v := tea.NewView(content)
 	v.AltScreen = true
+	// Capture the scroll wheel ourselves so it never falls through to the
+	// terminal's own scrollback while we're in the alt screen.
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }

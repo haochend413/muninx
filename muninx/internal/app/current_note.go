@@ -7,7 +7,6 @@ import (
 
 	editstack "github.com/haochend413/muninx/internal/app/editStack"
 	"github.com/haochend413/muninx/internal/models"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/haochend413/muninx/sys"
 )
 
@@ -163,27 +162,6 @@ func (a *App) SetCurrentNoteContent(content string) {
 	if err := a.editMgr.AddEdit(edit); err != nil {
 		sys.LogError(err)
 	}
-}
-
-func (a *App) CommitCurrentNoteChanges() {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-
-	note := a.getCurrentNote()
-	if note == nil {
-		return
-	}
-
-	// avoid empty commits
-	if note.CheckedContent == note.Content {
-		return
-	}
-
-	dmp := diffmatchpatch.New()
-	commit := models.NoteCommit{Patch: dmp.PatchToText(dmp.PatchMake(note.CheckedContent, note.Content)), CommitTime: time.Now()}
-	note.Commits = append(note.Commits, &commit)
-	note.Diff = dmp.DiffPrettyText((dmp.DiffMain(note.CheckedContent, note.Content, false)))
-	note.CheckedContent = note.Content
 }
 
 // SetCurrentNoteLastEdit updates the LastEdit timestamp of the current note to the current time.
