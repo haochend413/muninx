@@ -71,6 +71,7 @@ type Signal struct {
 
 // clearMsg is sent internally when a timed signal expires.
 type clearMsg struct {
+	bar *byte  // points to the bar that created this message; prevents cross-bar clearing
 	tag string
 	gen int // generation at Signal() time; stale if a newer signal was pushed
 }
@@ -84,6 +85,7 @@ type elem struct {
 
 // Model is the statusbar.
 type Model struct {
+	id     *byte // unique per-instance; copied by value, so all copies of the same bar share the same id
 	elems  map[string]*elem
 	left   []string
 	center []string
@@ -95,6 +97,7 @@ type Model struct {
 // New creates an empty statusbar with the given width and height.
 func New(width, height int) Model {
 	return Model{
+		id:     new(byte),
 		elems:  make(map[string]*elem),
 		width:  width,
 		height: height,
@@ -171,8 +174,9 @@ func (m *Model) Signal(tag string, s Signal) tea.Cmd {
 	if s.Duration <= 0 {
 		return nil
 	}
+	barID := m.id
 	return tea.Tick(s.Duration, func(time.Time) tea.Msg {
-		return clearMsg{tag: tag, gen: gen}
+		return clearMsg{bar: barID, tag: tag, gen: gen}
 	})
 }
 
@@ -195,8 +199,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 	case clearMsg:
-		if e, ok := m.elems[msg.tag]; ok && e.signalGen == msg.gen {
-			e.signal = nil
+		if msg.bar == m.id {
+			if e, ok := m.elems[msg.tag]; ok && e.signalGen == msg.gen {
+				e.signal = nil
+			}
 		}
 	}
 	return m, nil
