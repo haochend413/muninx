@@ -21,6 +21,8 @@ var globalApp *app.App
 var globalModel *ui.Model
 var globalEmbedClient *clients.EmbedClient
 
+var flagEmbed bool
+
 var rootCmd = &cobra.Command{
 	Use:   "muninx",
 	Short: "muninx",
@@ -65,8 +67,14 @@ var rootCmd = &cobra.Command{
 		cfg := config.LoadOrCreateConfig()
 		globalCfg = &cfg
 
-		// Initialize embedder and database
-		globalEmbedClient = clients.NewEmbedClient("http://127.0.0.1:8000")
+		// Start and connect to the embedding server only when -E is given.
+		if flagEmbed {
+			if err := launchEmbedServer(cfg.VenvDir, cfg.EmbedServerDir); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			globalEmbedClient = clients.NewEmbedClient(embedBaseURL)
+		}
 
 		var err error
 		globalDB, err = db.NewDB(cfg.DataFilePath+"/notes_dev.db", globalEmbedClient) // TODO: change this back in official version!
@@ -113,6 +121,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.Flags().BoolVarP(&flagEmbed, "embed", "E", false, "start the embedding server before launching")
 	rootCmd.AddCommand(ExportNoteCmd)
 	rootCmd.AddCommand(LaunchGUICmd)
 	rootCmd.AddCommand(DataBackupCmd)

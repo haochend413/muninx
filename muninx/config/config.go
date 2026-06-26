@@ -13,6 +13,10 @@ type Config struct {
 	// program state storage
 	StateFilePath string
 	DataFilePath  string
+
+	// Embedding server (only used when muninx is launched with -E)
+	VenvDir       string // path to Python venv, e.g. /path/to/project/.venv
+	EmbedServerDir string // path to dir containing embed.py
 }
 
 func generateDefault() Config {
